@@ -32,7 +32,8 @@ But given that I had done all the labsheets for my 'Operating Systems' module. I
 
 Initially, everything was making sense! But when it was time to actually do the '*raw input*' part... Man this shit was difficult!
 
-> [!NOTE] The use of AI - Claude in this project!
+> [!NOTE]
+> **The use of AI - Claude in this project!**
 > 
 > I personally hate things like Vibe Coding and similar things.
 >
@@ -49,7 +50,8 @@ Initially, everything was making sense! But when it was time to actually do the 
 > This is because I took my sweet time to make this initial version. As I am currently in Year 2 of UNI and because shit's hard. I did not really put much focus in this.
 > 
 
-> [!NOTE] Conquering My Fear
+> [!NOTE]
+> **Conquering My Fear**
 > 
 > For every project until now, I went and followed lots of tutorial, made lots of notes and also during the development of the project... I take even more notes!
 > 
