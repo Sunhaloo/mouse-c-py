@@ -4010,6 +4010,84 @@ PROCESS_INFORMATION pi = {0};
     // other codes for `main` function
 ```
 
+### Using More Macro Definition
+
+Added more macro definition so that we have a general place to change these "*settings*"
+
+```C
+// macro definition for how to long to run the program
+#define TIME_TO_RUN 60.0
+// macro definition for our CSV file name
+#define CSV_FILENAME "mouse_data.csv"
+// macro definition for our CSV writing "timer" / polling time
+#define CSV_POLLING_WRITING_INTERVAL 50
+```
+
+> [!WARNING]
+> I did also swap out the original values to use these macro "*variables*" in the actual code!
+
+### Flush To Disk Immediately
+
+- Add the following line of code just after writing ( *coordinates and mouse click counts* ) to `csv_file`:
+
+```C
+// global macro definition
+
+// macro definition for our flushing count ( write immediately to disk )
+#define CSV_FLUSH_WRITE_COUNT 500
+
+      // other codes ( current inside the `WindowProc` function )
+
+      // see below for "flushing" to disk immediately
+      static int write_count = 0;
+
+      // write the mouse data to the CSV file we created
+      fprintf(csv_file, "%ld,%ld,%d,%d,%d,%d,%d,%d,%d\n", coordinates.x, coordinates.y, left, right, middle, back, forward, scroll_up, scroll_down);
+
+      // force data to disk immediately ==> in case of program crash when "logging time" is increased
+      // NOTE: writing to disk immediately ( instead of the buffer ) is costly ==> flush for every 500 writes
+      if (++write_count % CSV_FLUSH_WRITE_COUNT == 0) {
+        // write to the disk for these `CSV_FLUSH_WRITE_COUNT` lines
+        fflush(csv_file);
+      }
+	  
+      // other codes ( current inside the `WindowProc` function )
+```
+
+Claude Haiku ( *from Zed Agent Panel* ) told me to add this but the Claude Sonnet ( *from the actual Website* ) is telling me that its totally fine to skip this!
+
+> Who should I thrust?
+
+I **added** it because of the `TIME_TO_RUN`; the thing is when I plan to add a GUI to this project; I plan to also allow the user to configure the `TIME_TO_RUN` so that they can either *increase* or *decrease* the time for the program to log the mouse coordinates and button click "*counts*".
+
+Therefore, if the user types '60 minutes' ( *current its in seconds so 3600 seconds* )... What is the program crashes to *for the logging* part or *in its entirety*.
+
+Well, the user is going to still have some data inside the `mouse_data.csv` file and then non-technical user could simply double-click on the `graphs.exe` executable file ( *I should updated the `README.md` file* ) and still get an **output**!
+
+> I am doing the trade-off of performance v/s data-loss here!
+
+### Error Messages
+
+Currently we were doing something like:
+
+```C
+// output appropriate messsage
+printf("...", GetLastError());
+```
+
+But we all know that `printf` outputs to `stdout` but if we are *displaying* and error... We **should** display / redirect to `stderr`.
+
+Therefore, switch out from `printf` to `fprintf` as `fprintf` can *output* to any stream.
+
+> Something along the lines of this:
+
+```C
+// for example
+fprintf(stderr, "\nFailed to get raw input data! Error: %lu\n", GetLastError());
+// flush 'stderr' immediately for new ones
+fflush(stderr);
+```
+
 ## Optimising Our Python File
 
 

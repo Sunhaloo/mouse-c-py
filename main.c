@@ -10,6 +10,12 @@
 
 // macro definition for how to long to run the program
 #define TIME_TO_RUN 60.0
+// macro definition for our CSV file name
+#define CSV_FILENAME "mouse_data.csv"
+// macro definition for our CSV writing "timer" / polling time
+#define CSV_POLLING_WRITING_INTERVAL 50
+// macro definition for our flushing count ( write immediately to disk )
+#define CSV_FLUSH_WRITE_COUNT 500
 
 // global handle to our hidden window
 HWND hwnd;
@@ -22,7 +28,7 @@ LONG last_y = 0;
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 // structure that contains information for our hidden window
-WNDCLASSEXW HiddenWindowClass;
+WNDCLASSEXW HiddenWindowClass = {0};
 
 // raw input device registration structure
 RAWINPUTDEVICE rid;
@@ -67,7 +73,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
       // check if `GetRawInputData` failed
       if (cbSize == (UINT)-1) {
-          printf("Failed to get raw input data! Error: %lu\n", GetLastError());
+          fprintf(stderr, "\nFailed to get raw input data! Error: %lu\n", GetLastError());
+          fflush(stderr);
           return 0;
       }
 
@@ -78,13 +85,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
           // NOTE: no need to display the coordinates anymore as we are writing to file
           // printf("x: %ld, y: %ld\n", coordinates.x, coordinates.y);
 
-          // update the global variable for the last coodinates found
+          // update the global variable for the last coordinates found
           last_x = coordinates.x;
           last_y = coordinates.y;
         }
 
       } else {
-        printf("\n Failed To Retrive Cursor Coordinates! Error: %lu", GetLastError());
+        fprintf(stderr, "\nFailed To Retrieve Cursor Coordinates! Error: %lu", GetLastError());
+        fflush(stderr);
       }
 
       // main mouse buttons temporary variable
@@ -120,12 +128,23 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
       }
 
+      // see below for "flushing" to disk immediately
+      static int write_count = 0;
+
       // write the mouse data to the CSV file we created
       fprintf(csv_file, "%ld,%ld,%d,%d,%d,%d,%d,%d,%d\n", coordinates.x, coordinates.y, left, right, middle, back, forward, scroll_up, scroll_down);
 
+      // force data to disk immediately ==> in case of program crash when "logging time" is increased
+      // NOTE: writing to disk immediately ( instead of the buffer ) is costly ==> flush for every 500 writes
+      if (++write_count % CSV_FLUSH_WRITE_COUNT == 0) {
+        // write to the disk for these `CSV_FLUSH_WRITE_COUNT` lines
+        fflush(csv_file);
+      }
+
+
+
       // NOTE: `return 0` so that we confirm that we handle this message
       return 0;
-
     }
 
     // for all the other message; let `DefWindowProcW` handle it for us
@@ -135,7 +154,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 // our main function
-int main(int argc, char *argv[]) {
+// FUN FACT: if you are not using "inline" arguments from the terminal
+// instead of using `int argc, char *argv[]` ==> simply use `void` instead
+int main(void) {
   // variable to keep the elapsed time
   double elapsed_time = 0;
 
@@ -152,7 +173,8 @@ int main(int argc, char *argv[]) {
 
   // actually register the window class for subsequent use
   if (!RegisterClassExW(&HiddenWindowClass)) {
-    printf("Failed to register window class! Error: %lu\n", GetLastError());
+    fprintf(stderr, "\nFailed to register window class! Error: %lu\n", GetLastError());
+    fflush(stderr);
     return 1;
   }
 
@@ -174,7 +196,8 @@ int main(int argc, char *argv[]) {
 
   // check if window creation is successfull or not
   if (hwnd == NULL) {
-    printf("Failed to create window! Error: %lu\n", GetLastError());
+    fprintf(stderr, "\nFailed to create window! Error: %lu\n", GetLastError());
+    fflush(stderr);
     return 1;
   }
 
@@ -187,7 +210,8 @@ int main(int argc, char *argv[]) {
   // actually register the raw input devices ( in our case mouse devices )
   // NOTE: pass the struct, the number of devies to register and size of struct
   if (!RegisterRawInputDevices(&rid, 1, sizeof(RAWINPUTDEVICE))) {
-    printf("Failed to register raw input device! Error: %lu\n", GetLastError());
+    fprintf(stderr, "\nFailed to register raw input device! Error: %lu\n", GetLastError());
+    fflush(stderr);
     return 1;
   }
 
@@ -201,11 +225,12 @@ int main(int argc, char *argv[]) {
   QueryPerformanceCounter(&start);
 
   // open the CSV file to write to --> start from scratch each program run
-  csv_file = fopen("mouse_data.csv", "w");
+  csv_file = fopen(CSV_FILENAME, "w");
 
   // check if the file has been able to open
   if (csv_file == NULL) {
-    printf("Failed to open CSV file for writing!\n");
+    fprintf(stderr, "\nFailed to open CSV file for writing!\n");
+    fflush(stderr);
 
     // return with an error
     return 1;
@@ -244,7 +269,7 @@ int main(int argc, char *argv[]) {
     }
 
     // sleep the program for 50 miliseconds to avoid large CSV files
-    Sleep(50);
+    Sleep(CSV_POLLING_WRITING_INTERVAL);
   }
 
   // change the --> for aesthetic purposes
@@ -279,7 +304,8 @@ int main(int argc, char *argv[]) {
     &pi
   )) {
     // meaning that the program `graphs.exe` was not found or something
-    printf("\nFailed To Launch `graphs.exe`! Error: %lu\n", GetLastError());
+    fprintf(stderr, "\nFailed To Launch `graphs.exe`! Error: %lu\n", GetLastError());
+    fflush(stderr);
 
   } else {
     // meaning that our `graphs.exe` as found ==> wait for it to complete
