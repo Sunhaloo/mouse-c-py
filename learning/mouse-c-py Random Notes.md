@@ -2605,7 +2605,7 @@ pyinstaller main.py
 > I see see that a `dist/main` directory has been created and inside that `main` folder, we have the following:
 > 
 > ```console
->     Directory: C:\Users\azmaan\Desktop\mouse-c-py\venv\dist\main
+>     Directory: C:\Users\username\Desktop\mouse-c-py\venv\dist\main
 > 
 > 
 > Mode                 LastWriteTime         Length Name
@@ -2781,11 +2781,11 @@ Recording mouse data... Time remaining: -0.0 seconds
 
 --------------------------------------------------
 
-CSV File 'mouse_data.csv' has been FOUND at 'C:\Users\azmaan\Desktop\mouse-c-py'!
+CSV File 'mouse_data.csv' has been FOUND at 'C:\Users\username\Desktop\mouse-c-py'!
 
 --------------------------------------------------
 
-Images has been created at 'C:\Users\azmaan/Downloads/'
+Images has been created at 'C:\Users\username/Downloads/'
 
 --------------------------------------------------
 
@@ -3003,6 +3003,1014 @@ jobs:
 > 
 > > I think I am going to do it!
 
+# Integrating Python Code Into C Code ( C-Python API )
+
+Okay, we are going to go off on a little tangent to learn about C-Python with Claude.
+
+> [!INFO] Resource(s)
+> 
+> - Mr AI: https://www.youtube.com/watch?v=ndLqg4RYcXE
+> - NeuralNine ( The GOAT Writes C Code ): https://www.youtube.com/watch?v=92Z6lqd8U8w
+
+## Learning C-Python Setup
+
+Here is what I currently have ( *and what I told Claude what I have* ):
+
+> I created a `test` folder over at `~/Desktop/test`
+
+```console
+Folder PATH listing
+Volume serial number is 5411-C9BE
+C:.
+    main.c
+    main.py
+    Makefile
+    
+No subfolders exist 
+```
+
+### Python Installation Location
+
+The most important thing right now is to know where our Python **executable file** is located on our system.
+
+> We can use the `Get-Command` command to do that ( *basically the `which` command found on Linux/UNIX systems* )!
+
+> [!NOTE]
+> Given that I know how to install things from the command line on Linux based systems.
+> 
+> Therefore, to download Python '3.14.2'; I simply used the official `winget` package manager.
+> 
+> What I am trying to say its that my `python.exe` path might **not** be similar to yours!
+
+- Find out where Python is located on our system:
+
+```powershell
+Get-Command python
+```
+
+- This is the output after running the above command:
+
+```console
+C:\Users\username\AppData\Local\Programs\Python\Python314\python.exe
+```
+
+> Remember this well as we are going to need this!
+
+### Modify `Makefile`
+
+We are going to have to modify our `Makefile` so that when we compile we link the Python library ( *codes* ) and the header file.
+
+Therefore, in my case, I am going to need these 2 files:
+
+1. `C:\Users\username\AppData\Local\Programs\Python\Python314\include`
+2. `C:\Users\user\AppData\Local\Programs\Python\Python314\libs`
+
+Hence, I am going to modify my `Makefile` so that it now looks like this:
+
+```bash
+# C-Python relate stuff
+PYTHON_INCLUDE = C:\Users\$(USERNAME)\AppData\Local\Programs\Python\Python314\include
+PYTHON_LIBS = C:\Users\$(USERNAME)\AppData\Local\Programs\Python\Python314\libs
+
+program: compile run clean
+
+compile:
+	@gcc main.c -I$(PYTHON_INCLUDE) -L$(PYTHON_LIBS) -lpython314 -Wall -Wextra -o program
+
+run:
+	@./program
+
+clean:
+	@del program.exe
+```
+
+> [A few words!](https://www.youtube.com/watch?v=E92glWB6sPE)
+
+So first of all, given that we have a "*user*" path in our `Makefile` now. I found out that you could simply do `$(USERNAME)` ( *like user the `USERNAME` variable* ) to replace *my* username with your system's username; in the case that you want to work with the code!
+
+> [!INFO]
+> 
+> > Fun Fact!
+> 
+> If you run `echo $USERNAME` or even `echo $USER` ( *the Linux way* ) inside Powershell. Well you get **nothing** at all!
+> 
+> If you want to get / see your *username* from Powershell; therefore, you are going to have to run this:
+> 
+> ```powershell
+> echo $env:USERNAME
+> ```
+
+Additionally, we are now linking the `Python.h` header and `python314.lib` file. But there is something that we need to do. We **don't** point to the actual `Python.h` and `python314.lib` file directly.
+
+Instead we simply *point* to the folder that they resides in!
+
+- Running `make` from my terminal, I see this as output:
+
+```console
+Hello World
+```
+
+> [!SUCCESS]
+> Very Fucking Nice!
+
+## Running Python From Inside of `main.c` File!
+
+> [!INFO] Resource(s)
+> 
+> - Official Python Documentation: https://docs.python.org/3/c-api/intro.html#include-files
+
+Go ahead and run the following code below.
+
+> Again, I know nothing about this and I am learning Claude!
+
+```C
+// include the Python header file ==> linked through `Makefile`
+#include <Python.h>
+#include <stdio.h>
+
+// idk Claude tell me that "its using the newer `ssize_t` compared to old `int`"
+// python official documentation: https://docs.python.org/3/c-api/intro.html#include-files
+#define PY_SSIZE_T_CLEAN
+
+// our main function
+int main(int argc, char *argv[]) {
+  // initiliase python interpreter
+  Py_Initialize();
+
+  // run 'hello world' from within C itself
+  printf("Hello World From C!\n");
+
+  // run 'hello world' from C but through Python ( intepreter )
+  PyRun_SimpleString("print('Hello World From C Through Python Interpreter')");
+
+  // shut down the python interpreter
+  Py_Finalize();
+
+  return 0;
+}
+```
+
+If you run the above code using our `Makefile`; we can see that our output is like so:
+
+```console
+Hello World From C Through Python Interpreter
+Hello World From C!
+```
+
+### Code Explanation
+
+- `#define PY_SSIZE_T_CLEAN`:
+	- Something that the official Python documentation says that you have to add
+	- Apparently uses some *type* of **better** *datatypes*
+- `Py_Initialize();`:
+	- Simple, enough, initialise the Python interpreter from inside of our C code
+- `PyRun_SimpleString("...");`:
+	- This is basically using the `print` function that is found in Python
+- `Py_Finalize();`:
+	- Simply close / exit out of the Python interpreter
+
+## Another More Concrete Example
+
+Let me do another learning session whereby this one is going to be much more inline to what we are going to be working with in the project.
+
+- Create a simple little `main.py` file:
+
+```python
+# function to add 2 integer numbers
+def int_add(x: int, y: int) -> int:
+    return x + y
+
+
+# function to greet the user
+def greet(name: str):
+    print(f"\n\t-- Hello {name}! --\n")
+
+
+# our main function that calls everything
+def main():
+    print("\n" + "-" * 50, "\n")
+    print("\t-- Python File's Main Function --")
+    print("\n" + "-" * 50, "\n")
+
+    # ask the user to enter this name
+    user_name = input("Please Enter Your Name: ")
+
+    # call the function to greet the user
+    greet(user_name)
+
+    # ask the user to enter 2 integer numbers to add
+    while True:
+        try:
+            num_1 = int(input("Please Enter First Number: "))
+            num_2 = int(input("Please Enter Second Number: "))
+
+            break
+
+        except ValueError:
+            print("\n\t == Enter Integer Numbers Only!!! ==\n")
+
+    addition_result: int = int_add(num_1, num_2)
+
+    print(f"\nResult Of Addition: {addition_result}")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+- *Initialise* our `main.c` file:
+
+```C
+// as per the official python documentation
+#define PY_SSIZE_T_CLEAN
+
+// include the Python header file ==> linked through `Makefile`
+#include <Python.h>
+
+// our main function
+int main(int argc, char *argv[]) {
+  // initiliase python interpreter
+  Py_Initialize();
+
+  // shut down the python interpreter
+  Py_Finalize();
+
+  return 0;
+}
+```
+
+### Call A Single Function Only And Pass Arguments
+
+```C
+// include the Python header file ==> linked through `Makefile`
+// as per the official python documentation
+#define PY_SSIZE_T_CLEAN
+
+// include the Python header file ==> linked through `Makefile`
+#include <Python.h>
+
+
+// our main function
+int main(int argc, char *argv[]) {
+  // initiliase python interpreter
+  Py_Initialize();
+
+  // import the `main.py` file as a module ( basically )
+  // INFO: we don't add the `.py` extension
+  PyObject *module = PyImport_ImportModule("main");
+
+  // get the `greet` function from Python file
+  // this is done by ( creating a ) referencing the `greet` function inside `main.py`
+  PyObject *greet_function = PyObject_GetAttrString(module, "greet");
+
+  // our arguments
+  // NOTE: everything that needs to be passed as arguments should be inside a tuple
+  // INFO: the `"(s)"` represents that we are passing a string argument
+  PyObject *greet_arguments = Py_BuildValue("(s)", "Sebastien Vettel");
+
+  // call the function from inside C code!
+  PyObject *greet_func_result = PyObject_CallObject(greet_function, greet_arguments);
+
+  // decrement reference counts to tell Python we are done with these objects
+  // INFO: when reference count hits 0, Python's memory manager frees the object from the heap
+  Py_DECREF(greet_func_result);
+  Py_DECREF(greet_arguments);
+  Py_DECREF(greet_function);
+  Py_DECREF(module);
+
+  // shut down the python interpreter
+  Py_Finalize();
+
+  return 0;
+}
+```
+
+- This is the output after running the above `main.c` file:
+
+```console
+
+	-- Hello Sebastien Vettel! --
+
+```
+
+> [!INFO]
+> I just noticed something.
+> 
+> You see how we packaged the argument for the `greet` function inside a **tuple** right?
+> 
+> Well, talking with [Gemini](https://gemini.google.com). It did tell me that it does use some *sort of* `tuple` behind the scenes.
+> 
+> > "*sort of*" because you and me know that its much complicated behind the scenes!
+
+### Call Function That Will Return Something
+
+```C
+// as per the official python documentation
+#define PY_SSIZE_T_CLEAN
+
+// include the Python header file ==> linked through `Makefile`
+#include <Python.h>
+
+void display_rule(int char_count) {
+  printf("\n\t");
+
+  for (int i = 0; i < char_count; i++) {
+    printf("-");
+  }
+  printf("\n\n");
+}
+
+// as per the official python documentation
+#define PY_SSIZE_T_CLEAN
+
+// our main function
+int main(int argc, char *argv[]) {
+  // initiliase python interpreter
+  Py_Initialize();
+
+  // import the `main.py` file as a module ( basically )
+  // INFO: we don't add the `.py` extension
+  PyObject *module = PyImport_ImportModule("main");
+
+  // get the `int_add` function from Python file
+  PyObject *int_add_function = PyObject_GetAttrString(module, "int_add");
+
+  // pass our arguments
+  // NOTE: as you can see here; we are passing 2 integer numbers
+  // therefore, we simply do `"(ii)"`
+  PyObject *int_add_arguments = Py_BuildValue("(ii)", 1, 1);
+
+  // simply run the `int_add` function of the `main.py` file
+  PyObject *int_add_result = PyObject_CallObject(int_add_function, int_add_arguments);
+
+  // get the data from the result of the function
+  // WARNING: needs to be converted back into a simple C data type / "object"
+  int addition_result = (int)PyLong_AsLong(int_add_result);
+
+  // display the result to from C
+  display_rule(50);
+  printf("\t   -- Result Of Python Addition Function: %d! --\n", addition_result);
+  display_rule(50);
+
+  // clean memory to avoid memory leaks by "imported" function
+  // INFO: meaning that not leftover Python's functions left behind in C's memory
+  Py_DECREF(int_add_result);
+  Py_DECREF(int_add_arguments);
+  Py_DECREF(int_add_function);
+  Py_DECREF(module);
+
+  // shut down the python interpreter
+  Py_Finalize();
+
+  return 0;
+}
+```
+
+- This is the output after running the above `main.c` file:
+
+```console
+
+	--------------------------------------------------
+
+	   -- Result Of Python Addition Function: 2! --
+
+	--------------------------------------------------
+
+```
+
+### Call The Python Main Function From C
+
+```C
+// as per the official python documentation
+#define PY_SSIZE_T_CLEAN
+
+// include the Python header file ==> linked through `Makefile`
+#include <Python.h>
+
+// our main function
+int main(int argc, char *argv[]) {
+  // initiliase python interpreter
+  Py_Initialize();
+
+  // import the `main.py` file as a module ( basically )
+  // INFO: we don't add the `.py` extension
+  PyObject *module = PyImport_ImportModule("main");
+
+  // get the `main` function from Python file
+  PyObject *main_function = PyObject_GetAttrString(module, "main");
+
+  // NOTE: no arguments
+  // even if there are no arguments that we "physically" have to pass
+  // Python functions still expect a tuple argument for the functions
+
+  // simply run the `main` function of the `main.py` file
+  PyObject *main_result = PyObject_CallObject(main_function, PyTuple_New(0));
+
+  // decrement reference counts to tell Python we are done with these objects
+  // INFO: when reference count hits 0, Python's memory manager frees the object from the heap
+  Py_DECREF(main_result);
+  Py_DECREF(main_function);
+  Py_DECREF(module);
+
+  // shut down the python interpreter
+  Py_Finalize();
+
+  return 0;
+}
+```
+
+- This is the output after running the above `main.c` file:
+
+```console
+
+--------------------------------------------------
+
+	-- Python File's Main Function --
+
+--------------------------------------------------
+
+Please Enter Your Name: Lewis Hamilton
+
+	-- Hello Lewis Hamilton! --
+
+Please Enter First Number: 1
+Please Enter Second Number: 2
+
+Result Of Addition: 3
+```
+
+# Actual Python Code Integration
+
+We are going to have to do some little things before we actually start using C-Python in our project.
+
+1. Create a new branch `v0.2.0`
+2. Update the `Makefile` to include Python header and library file(s)
+3. Then go ahead and use C-Python
+
+## Updating Makefile
+
+Well, we know that we have to **update** our `Makefile` so that we can link up the `Python.h` header file and also the Python libraries found on our system.
+
+Now, there is also something that we need to consider an cater for.
+
+> GitHub Releases!
+
+We are going to want to **also** update it so that we have a separate build "*path*" for GitHub's Workflow compute.
+
+Hence, the simple reason as to why we have to do that!
+
+```bash
+# ohh this is similar to a C header file
+# NOTE: `pythonLocation` is an environment variable created by `actions/setup-python`
+ifdef pythonLocation
+	# for remote release
+	PYTHON_INCLUDE = $(pythonLocation)\include
+	PYTHON_LIBS = $(pythonLocation)\libs
+else
+	# for local development
+	# NOTE: I install Python using the "official" `winget` package manager
+	PYTHON_INCLUDE = C:\Users\$(USERNAME)\AppData\Local\Programs\Python\Python314\include
+	PYTHON_LIBS = C:\Users\$(USERNAME)\AppData\Local\Programs\Python\Python314\libs
+endif
+
+
+# remote - GitHub Actions ( compiling the `main.c` file )
+build:
+	@gcc main.c -I$(PYTHON_INCLUDE) -L$(PYTHON_LIBS) -lpython314 -Wall -Wextra -o program.exe
+
+# local development ( running and testing )
+program: compile run clean
+
+# compile the program
+compile:
+	@gcc main.c -I$(PYTHON_INCLUDE) -L$(PYTHON_LIBS) -lpython314 -Wall -Wextra -o program.exe
+
+# run the `program.exe` executable file
+run:
+	@./program.exe
+
+# remove / clean the `program.exe` executable file
+clean:
+	@del program.exe
+```
+
+## Update Release YAML File
+
+Similarly, as we are going to be using C-Python; we won't need to create the `graphs.exe` executable file anymore.
+
+Therefore, we are going to remove the `pyinstaller` part from the `release.yml` file.
+
+```yml
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: pip install matplotlib numpy pandas
+
+      - name: Install MSYS2
+        run: choco install msys2 -y
+
+      - name: Build program.exe
+        run: make build
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            program.exe
+            dist/graphs.exe
+```
+
+## Update Requirements File Also!
+
+> Yeap, I nearly forgot about this!
+
+We also need to update our `requirements.txt` file so that we don't install *bloat* on our system.
+
+```console
+contourpy==1.3.3
+cycler==0.12.1
+fonttools==4.62.1
+kiwisolver==1.5.0
+matplotlib==3.10.8
+numpy==2.4.4
+packaging==26.0
+pandas==3.0.2
+pillow==12.2.0
+pyparsing==3.3.2
+python-dateutil==2.9.0.post0
+six==1.17.0
+tzdata==2026.1
+```
+
+> [!INFO]
+> I am now going to create our `v0.2.0` branch and then update the required files!
+
+## Updating Our C File!
+
+> [!NOTE]
+> I am only showing you the `main` function of the `main.c` file!
+
+```C
+// our main function
+int main(int argc, char *argv[]) {
+  // variable to keep the elapsed time
+  double elapsed_time = 0;
+
+  // declare variables for the timer
+  LARGE_INTEGER frequency;
+  LARGE_INTEGER start, current;
+
+  // initialize `HiddenWindowClass` at runtime
+  // INFO: doing it in this way to avoid declaration errors
+  HiddenWindowClass.cbSize        = sizeof(WNDCLASSEXW);
+  HiddenWindowClass.lpfnWndProc   = WindowProc;
+  HiddenWindowClass.hInstance     = GetModuleHandleW(NULL);
+  HiddenWindowClass.lpszClassName = L"RawInputWindow";
+
+  // actually register the window class for subsequent use
+  if (!RegisterClassExW(&HiddenWindowClass)) {
+    printf("\nFailed to register window class! Error: %lu\n", GetLastError());
+    return 1;
+  }
+
+  // create a window ==> pass "correct" parameters to make it hidden
+  hwnd = CreateWindowExW(
+    0,
+    L"RawInputWindow",
+    L"",
+    0,
+    0,
+    0,
+    0,
+    0,
+    HWND_MESSAGE,
+    NULL,
+    GetModuleHandleW(NULL),
+    NULL
+  );
+
+  // check if window creation is successfull or not
+  if (hwnd == NULL) {
+    printf("\nFailed to create window! Error: %lu\n", GetLastError());
+    return 1;
+  }
+
+  // configure the raw input device structure to target mouse input
+  rid.usUsagePage = HID_USAGE_PAGE_GENERIC;
+  rid.usUsage     = HID_USAGE_GENERIC_MOUSE;
+  rid.dwFlags     = RIDEV_INPUTSINK;
+  rid.hwndTarget  = hwnd;
+
+  // actually register the raw input devices ( in our case mouse devices )
+  // NOTE: pass the struct, the number of devies to register and size of struct
+  if (!RegisterRawInputDevices(&rid, 1, sizeof(RAWINPUTDEVICE))) {
+    printf("\nFailed to register raw input device! Error: %lu\n", GetLastError());
+    return 1;
+  }
+
+  // initialise the message structure's data to '0'
+  MSG message = {0};
+
+  // get the number of ticks that makes up one second from CPU
+  QueryPerformanceFrequency(&frequency);
+
+  // get the actual time stamp for the start time
+  QueryPerformanceCounter(&start);
+
+  // open the CSV file to write to --> start from scratch each program run
+  csv_file = fopen("mouse_data.csv", "w");
+
+  // check if the file has been able to open
+  if (csv_file == NULL) {
+    printf("\nFailed to open CSV file for writing!\n");
+
+    // return with an error
+    return 1;
+  }
+
+  // write the header for the CSV file
+  fprintf(csv_file, "x,y,left,right,middle,back,forward,scroll_up,scroll_down\n");
+
+  // iterate through the `while` loop indefinitely
+  while (1) {
+    // get the messages from the queue
+    while (PeekMessageW(&message, hwnd, 0, 0, PM_REMOVE)) {
+      // send that message to the hidden window for processing
+      // whereby our mouse raw data will be handled
+      DispatchMessageW(&message);
+    }
+
+    // get the actual time stamp for the current time
+    QueryPerformanceCounter(&current);
+
+    // calculate the elapsed time
+    elapsed_time = (double)(current.QuadPart - start.QuadPart) / frequency.QuadPart;
+
+    // calaculate the remaining time before the program ends
+    double remaining = TIME_TO_RUN - elapsed_time;
+
+    printf("\rRecording mouse data... Time remaining: %.1f seconds ", remaining);
+
+    // NOTE: flushing directly to the screen as we are inside a `while` loop
+    fflush(stdout);
+
+    // check if the time to "leave" has been reached!
+    if (elapsed_time >= TIME_TO_RUN) {
+      // `break` to "exit" the `while` loop
+      break;
+    }
+
+    // sleep the program for 50 miliseconds to avoid large CSV files
+    Sleep(50);
+  }
+
+  // change the --> for aesthetic purposes
+  printf("\n");
+
+  // close the file to free up memory
+  fclose(csv_file);
+
+  // C-Python integration / coding
+
+  // intialise the python interpreter
+  Py_Initialize();
+
+  // import the 'main.py' file inside our C codebase
+  PyObject *py_module = PyImport_ImportModule("main");
+
+  // check if we successfully import the 'main.py' file
+  if (py_module == NULL) {
+    printf("\nFailed to import the 'main.py' file!\n");
+
+    // display the error from python's interpreter
+    PyErr_Print();
+
+    // shutdown the python's interpreter
+    Py_Finalize();
+
+    // return an error to the user
+    return 1;
+  }
+
+  // reference the `main` function from the 'main.py' file
+  PyObject *py_func = PyObject_GetAttrString(py_module, "main");
+
+  // check if we are able to "get" the `main` function of 'main.py'
+  if (py_func == NULL) {
+    printf("\nFailed to get `main` function of 'main.py' file!\n");
+
+    // display the error from python's interpreter
+    PyErr_Print();
+
+    // decrement reference count --> when '0' ==> removed from memory's heap
+    Py_DECREF(py_module);
+
+    // shutdown the python's interpreter
+    Py_Finalize();
+
+    // return an error to the user
+    return 1;
+  }
+
+  // INFO: no need to pass arguments but it expects a tuple
+  // for more information refer to 'learning.md' file or online resources
+
+  // simply run the python's `main` function from inside of here!
+  PyObject *py_output = PyObject_CallObject(py_func, PyTuple_New(0));
+
+  // check if we are able to call the `main` function of 'main.py'
+  if (py_output == NULL) {
+    printf("\nFailed to run `main` function of 'main.py' file!\n");
+
+        // display the error from python's interpreter
+        PyErr_Print();
+
+        // decrement reference count --> when '0' ==> removed from memory's heap
+        Py_DECREF(py_func);
+        Py_DECREF(py_module);
+
+        // shutdown the python's interpreter
+        Py_Finalize();
+
+        // return an error to the user
+        return 1;
+  }
+
+  // decrement reference count --> when '0' ==> removed from memory's heap
+  Py_DECREF(py_output);
+  Py_DECREF(py_func);
+  Py_DECREF(py_module);
+
+  // shutdown the python interpreter
+  Py_Finalize();
+
+  // destroy the hidden window that we created
+  DestroyWindow(hwnd);
+  // unregister the window class
+  UnregisterClassW(L"RawInputWindow", GetModuleHandleW(NULL));
+
+  printf("Program Exiting... Thank You!\n");
+
+  return 0;
+}
+```
+
+# The Problem
+
+> [Houston we have problem](https://www.youtube.com/watch?v=eco_xvkEQlg)!
+
+## What Was I Trying To Do?
+
+So currently in our `v0.1.0` branch we have 2 executable file that a *non-technical* user has to download in order to be able to use it.
+
+What I am trying to do is eliminate the need for the user to download the `graphs.exe` executable file and to simply run use C-Python API and be able to run the functions found inside the `main.py` file without having to create the `graphs.exe` file!
+
+> [!TIP]
+> I was like: "*OMG I am so smart*"!
+> 
+> Then the user will simply need to download the **extremely small** `program.exe` file and thus be happy that I don't bloat his / her system!
+> 
+> > "*Professional*" I said to myself!
+> 
+> Well fuck!
+
+## The Problem In Detail
+
+The above codes that I for when I was learning C-Python **does** work and you are able to run it!
+
+The problem comes with the Python **virtual environment**!
+
+Compiling the program **without** the Python's virtual environment and all of the `requirements.txt` is going to result in this:
+
+```console
+Failed to import the 'main.py' file!
+Traceback (most recent call last):
+  File "C:\Users\username\Desktop\mouse-c-py\main.py", line 5, in <module>
+    import matplotlib.pyplot as plt
+ModuleNotFoundError: No module named 'matplotlib'
+make: *** [Makefile:28: run] Error 1
+```
+
+Therefore, I simply created a new `venv` folder, moved things like `main.c`, `main.py` and `Makefile` there and thus compiled again.
+
+Running the new, freshly compiled `program.exe` file does result in a working "*program*" and the `.png` files does get created in our `~/Downloads` folder!
+
+> But we do get this little pesky warning!
+
+```console
+<frozen site>:101: RuntimeWarning: Unexpected value in sys.prefix, expected C:\Users\username\Desktop\mouse-c-py, got C:\Users\username\Desktop\mouse-c-py\venv
+<frozen site>:101: RuntimeWarning: Unexpected value in sys.exec_prefix, expected C:\Users\username\Desktop\mouse-c-py, got C:\Users\username\Desktop\mouse-c-py\venv
+```
+
+> [!NOTE]
+> I knew that it was related to python because of the 'sys' word. Nevertheless, had not clue of why we do get this warning message.
+> 
+> After speaking with Claude; it told me that this is due to the fact that our `main.c` file has been compiled inside the `venv` folder and it should have instead been compiled *outside* ( *i.e `~/Desktop/mouse-c-py`* ).
+
+> But this is line an infinite loop whereby I need our `main.c` file to be **inside** `venv` to be able to compile.
+
+## In The End
+
+Well, for the *non-technical* user to use my program, he / she have had to:
+
+1. Clone the repository
+2. Make sure that Python, MYSYS, GCC and MAKE are installed on their system
+3. Create a virtual environment and compiled the `main.c` file
+
+> You get the fucking point!
+
+Well in that case, the "*non-technical*" user will think that he is a hacker at this point ( *like in the movies* )!
+
+> [!WARNING]
+> Therefore, I think for now, I am just going to leave it whereby the user is going to have to download **both** the `program.exe` and `graphs.exe` file to be able to use my program.
+> 
+> This will remove any complicated things from my side and also any complicated dependencies thingy!
+
+> [!INFO]
+> Hence, I am simply going to try to optimise the current code to the best of me and Claude's abilities for `v.0.2.0` and in `v0.3.0` we are going to implement the Raylib ( GUI ) GUI!
+
+> "Mission failed successfully!"
+
+# Version 0.2.0
+
+> [!WARNING]
+> Given that I "*lost*" and I have reverted all my codes back to the current codes found in the **branch** of `v0.1.0`.
+> 
+> > Well, I am going to continue where I left off from there!
+
+## Chatting With Gemini!
+
+I am currently chatting with Gemini and I was just speaking about decreasing the size of the `graphs.exe` file and there is a lot of things that we can do.
+
+Apparently when we compile, using `pyinstaller`, a simple, let's say 'hello world' Python program. Its also going to compile things like 'TKinter' and such and such.
+
+Therefore, `pyinstaller` give you the `--exclude` flag so that we are able to remove them.
+
+> [!INFO] But how do you see what you can remove?
+> 
+> But how can you check which files are bundled with your created executable file.
+> 
+> This is where the `--onedir` flags comes into play!
+> 
+> Therefore, I am going to run the following command with our **current** `main.py` file and all of the code inside still intact.
+> 
+> ```powershell
+> pyinstaller --onedir --name graphs main.py
+> ```
+> 
+> The executable file is going to still created under the `venv\dist\graphs` but we are **not** interested in that right now; what we are actually interested is the `_internal` folder found *under* that **same directory**.
+> 
+> Go ahead and use the properties window or the command line to check for its side; I see that the whole folder is around 88.9 MB ( *actual 'Size' from the Properties window* ).
+> 
+> > The actual `graphs.exe` file is still around 46.3 MB *if we use the `--onefile` flag instead of the current flag*
+
+### Excluding some things
+
+Let's just go ahead and **exclude** some modules and we should see a **small decrease** in file size.
+
+- Compile the `main.py` file using the following command:
+
+```powershell
+pyinstaller --onedir \
+--exclude-module tkinter \
+--exclude-module tcl \
+--exclude-module _tkinter \
+--exclude-module sqlite3 \
+--exclude-module IPython \
+--exclude-module jedi \
+--exclude-module matplotlib.tests \
+--exclude-module numpy.tests \
+--name graphs \
+main.py
+```
+
+> [!WARNING]
+> So the thing is; we know that Windows is shit but I did not really know that Windows Terminal ( *more like Powershell and CMD* ) does not allow us to use the `\` character to indicate that the command is actually on a single line but we just *spread* it across multiple ones.
+> 
+> Therefore, the above command does not actually works... Therefore, you are going to have to use this one:
+> 
+> ```powershell
+> pyinstaller --onedir `
+> --exclude-module tkinter `
+> --exclude-module tcl `
+> --exclude-module _tkinter `
+> --exclude-module sqlite3 `
+> --exclude-module IPython `
+> --exclude-module jedi `
+> --exclude-module matplotlib.tests `
+> --exclude-module numpy.tests `
+> --name graphs `
+> main.py
+> ```
+
+> [!SUCCESS]
+> While still having all our dependencies like `matplotlib`, `numpy` and `pandas`; we see that the `_internal` folder size has been reduced to 79.7 MB!
+> 
+> Additionally if we change out the `--onedir` flag for the `--onefile` flag we should also see that the file size is now 42.5 MB.
+
+> [!INFO]
+> I just ran the above command but instead of using `--onedir`; I used `--onefile` and moved my `graphs.exe` ( *output* ) from the `dist` folder to my *current* working `~/Desktop/mouse-c-py` folder and compile the `main.c` and therefore ran it
+> 
+> > [!SUCCESS]
+> > It code runs and our images are created successfully in our `~/Downloads` folder.
+
+> [!NOTE]
+> So I am going to update the `main.py` file code later so that we can optimise it more and more and also Gemini did tell me that `pandas` is **too overkill** for the thing that I am trying to do.
+> 
+> > Its also the thing that is contributing to our *large* file size.
+> 
+> Therefore, we are later going to simply use the *built-in* `csv` module to do all of our processing for our `mouse_data.csv` file.
+
+## Optimising Our C File
+
+Okay, this is basically going to be me talking with Claude and learning how to actually optimise our `main.c` codebase so that we have more *security*, *better readability* and if we can, *further optimise* it.
+
+> We are going to be solving *major* issues that is found inside the code and also fix shit up wherever we can!
+
+### Create Process Instead Of Calling System
+
+> [!INFO] Resource(s)
+> - `CreateProcessW`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw
+> - `STARTUPINFOW`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/ns-processthreadsapi-startupinfow
+> - `PROCESS_INFORMATION`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/ns-processthreadsapi-process_information
+> - `WaitForSingleObject`: https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject
+
+We are now going to swap out the *dangerous* `system` function call to the `graphs.exe` executable file in favour of `CreateProcessW`.
+
+- Therefore, remove the `system("graphs.exe");` function call in favour of this one:
+
+```C
+// INFO: declared at the top of the file --> global variables
+// create array for new process start-up and process information
+STARTUPINFOW si = {0};
+PROCESS_INFORMATION pi = {0};
+
+// other codes
+
+  // other codes for `main` function
+  
+  // find the size of the structure / array `si` --> for the startup information
+  si.cb = sizeof(si);
+
+  // create a new process and run `graphs.exe` in that process
+  if (!CreateProcessW(
+    // name of process / executable to run
+    L"graphs.exe",
+    NULL,
+    NULL,
+    NULL,
+    // does not inherit any handles
+    FALSE,
+    // no creation flags has been passed
+    0,
+    NULL,
+    NULL,
+    // start-up information
+    &si,
+    // process information
+    &pi
+  )) {
+    // meaning that the program `graphs.exe` was not found or something
+    printf("\nFailed To Launch `graphs.exe`! Error: %lu\n", GetLastError());
+
+  } else {
+    // meaning that our `graphs.exe` as found ==> wait for it to complete
+    WaitForSingleObject(pi.hProcess, INFINITE);
+
+    // close the handle for the new process
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+  }
+
+    // other codes for `main` function
+```
+
+## Optimising Our Python File
 
 
 ---

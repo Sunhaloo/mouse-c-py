@@ -1,9 +1,10 @@
 #include <errhandlingapi.h>
 #include <minwindef.h>
+#include <processthreadsapi.h>
 #include <profileapi.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <hidusage.h>
+#include <synchapi.h>
 #include <windows.h>
 #include <winnt.h>
 
@@ -31,6 +32,13 @@ POINT coordinates;
 
 // FILE pointer for writing mouse data to CSV file
 FILE *csv_file;
+
+// create array for new process start-up and process information
+STARTUPINFOW si = {0};
+PROCESS_INFORMATION pi = {0};
+
+// function to check if the `graphs.exe` file is present
+// WARNING: implement later
 
 // function to handle all non-raw-input message
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -248,9 +256,39 @@ int main(int argc, char *argv[]) {
   // call the `graphs.exe` created by `pyinstaller` from the `main.py` file
   // INFO: this calls the `graphs.exe` file which is going to search
   // for our CSV file and then be able to generate the graphs in our downloads folder!
-  // WARNING: I think this is shit and might be a security issue
-  // but for what it is right now, I don't really care!
-  system("graphs.exe");
+
+  // find the size of the structure / array `si` --> for the startup information
+  si.cb = sizeof(si);
+
+  // create a new process and run `graphs.exe` in that process
+  if (!CreateProcessW(
+    // name of process / executable to run
+    L"graphs.exe",
+    NULL,
+    NULL,
+    NULL,
+    // does not inherit any handles
+    FALSE,
+    // no creation flags has been passed
+    0,
+    NULL,
+    NULL,
+    // start-up information
+    &si,
+    // process information
+    &pi
+  )) {
+    // meaning that the program `graphs.exe` was not found or something
+    printf("\nFailed To Launch `graphs.exe`! Error: %lu\n", GetLastError());
+
+  } else {
+    // meaning that our `graphs.exe` as found ==> wait for it to complete
+    WaitForSingleObject(pi.hProcess, INFINITE);
+
+    // close the handle for the new process
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+  }
 
   // destroy the hidden window that we created
   DestroyWindow(hwnd);
