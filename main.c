@@ -1,17 +1,19 @@
-#include <errhandlingapi.h>
-#include <minwindef.h>
-#include <processthreadsapi.h>
+#include <pathcch.h>
 #include <profileapi.h>
 #include <stdio.h>
 #include <hidusage.h>
-#include <synchapi.h>
 #include <windows.h>
-#include <winnt.h>
 
 // macro definition for how to long to run the program
-#define TIME_TO_RUN 60.0
+#define TIME_TO_RUN 10.0
 // macro definition for our CSV file name
 #define CSV_FILENAME "mouse_data.csv"
+// macro definition for our `graphs.exe` executable file name
+// #define PYTHON_GRAPHS_FILENAME "graphs.exe"
+// macro definition for our CSV file name --> wide strings ( unicode )
+#define CSV_FILENAME_W L"mouse_data.csv"
+// macro definition for our `graphs.exe` executable file name --> wide strings ( unicode )
+#define PYTHON_GRAPHS_FILENAME_W L"graphs.exe"
 // macro definition for our CSV writing "timer" / polling time
 #define CSV_POLLING_WRITING_INTERVAL 50
 // macro definition for our flushing count ( write immediately to disk )
@@ -39,12 +41,93 @@ POINT coordinates;
 // FILE pointer for writing mouse data to CSV file
 FILE *csv_file;
 
-// create array for new process start-up and process information
-STARTUPINFOW si = {0};
-PROCESS_INFORMATION pi = {0};
+// function to check if a file is present under the current working directory
+int check_file_existance(const wchar_t *filename) {
+  // part 1: get the current working directory
 
-// function to check if the `graphs.exe` file is present
-// WARNING: implement later
+  // create the buffer to hold current working directory
+  wchar_t getcwd_buffer[MAX_PATH];
+
+  // try to get the current working directory by calling function
+  DWORD getcwd_result = GetCurrentDirectoryW(MAX_PATH, getcwd_buffer);
+
+  // check if we have been able to get the current working directory
+  if (getcwd_result == 0) {
+    // meaning we failed to get the current working directory
+    fprintf(stderr, "\nFailed to get current working directory!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  }
+
+  // check if our ( result ) buffer is too small
+  if (getcwd_result >= MAX_PATH) {
+    fprintf(stderr, "\nGet current working directory buffer is too small!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  }
+
+  // display the current working directory
+  wprintf(L"\nCurrent Working Directory Buffer: %ls\n", getcwd_buffer);
+
+  // part 2: combine the paths
+
+  // create a buffer to hold the full path
+  wchar_t fullpath[MAX_PATH] = {0};
+
+  // try to combine paths by calling function
+  HRESULT hr = PathCchCombine(fullpath, MAX_PATH, getcwd_buffer, filename);
+
+  // check if we have been able to combine the paths
+  if (FAILED(hr)) {
+    // meaning that the paths were not able to be combined
+    fprintf(stderr, "\nFailed to combine paths ( Error Code: 0x%08lx )!\n", (unsigned long)hr);
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  }
+
+  // display the full combined paths
+  wprintf(L"\nCombined Path Buffer: %ls\n", fullpath);
+
+  // part 3: check if the file actually exists in the directory
+
+  // try to check if file exists by calling function
+  DWORD attrs = GetFileAttributesW(fullpath);
+
+  // check if the file actually exists
+  if (attrs == INVALID_FILE_ATTRIBUTES) {
+    // meaning that the file does NOT exists
+    fprintf(stderr, "\nERROR: File does not exists!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  } else {
+    // meaning that the file does exists
+    printf("\nFile Attributes Checker: File does exists!\n");
+  }
+
+  // part 4: check if the file is an actual file or directory
+  if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
+    // meaning that its actually a directory
+    fprintf(stderr, "\nERROR: Path is a directory!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  } else {
+    // meaning that its actually a file
+    printf("\nFile Checker: Path is a file!\n");
+  }
+
+  return 0;
+}
+
 
 // function to handle all non-raw-input message
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -140,8 +223,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         // write to the disk for these `CSV_FLUSH_WRITE_COUNT` lines
         fflush(csv_file);
       }
-
-
 
       // NOTE: `return 0` so that we confirm that we handle this message
       return 0;
@@ -278,9 +359,20 @@ int main(void) {
   // close the file to free up memory
   fclose(csv_file);
 
+  // check if the CSV file has been created under the current directory
+  check_file_existance(CSV_FILENAME_W);
+
+  // check if the CSV file has been downloaded and moved to the current ( working ) directory
+  check_file_existance(PYTHON_GRAPHS_FILENAME_W);
+
   // call the `graphs.exe` created by `pyinstaller` from the `main.py` file
   // INFO: this calls the `graphs.exe` file which is going to search
   // for our CSV file and then be able to generate the graphs in our downloads folder!
+
+  // create array for new process start-up and process information
+  // INFO: again, this is created / used for the `CreateProcessW` function
+  STARTUPINFOW si = {0};
+  PROCESS_INFORMATION pi = {0};
 
   // find the size of the structure / array `si` --> for the startup information
   si.cb = sizeof(si);
@@ -288,7 +380,7 @@ int main(void) {
   // create a new process and run `graphs.exe` in that process
   if (!CreateProcessW(
     // name of process / executable to run
-    L"graphs.exe",
+    PYTHON_GRAPHS_FILENAME_W,
     NULL,
     NULL,
     NULL,
