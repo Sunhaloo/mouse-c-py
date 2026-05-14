@@ -18,4 +18,4 @@ clean:
 	@del program.exe
 
 test:
-	@gcc test.c -Wall -Wextra -lgdi32 -lpathcch -o program.exe
+	@gcc test.c -Wall -Wextra -pedantic -lgdi32 -lpathcch -o program.exe

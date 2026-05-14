@@ -1,84 +1,106 @@
 #include <fileapi.h>
+#include <processenv.h>
 #include <windows.h>
 #include <pathcch.h>
 #include <stdio.h>
 #include <wchar.h>
+#include <wingdi.h>
+#include <winnt.h>
 
 #define CSV_FILENAME L"mouse_data.csv"
 #define EXE_FILENAME L"graphs.exe"
 
-// function to get the current working directory (wide)
-static int getcwd_w(wchar_t result_buffer[MAX_PATH]) {
-  DWORD result = GetCurrentDirectoryW(MAX_PATH, result_buffer);
+// function to check if a file exists
+int check_file_existance(const wchar_t *filename) {
+  // part 1: get the current working directory
 
-  if (result == 0) {
-    fprintf(stderr, "\nFailed to get the current working directory %lu!\n", GetLastError());
+  // create the buffer to hold current working directory
+  wchar_t getcwd_buffer[MAX_PATH];
+
+  // try to get the current working directory by calling function
+  DWORD getcwd_result = GetCurrentDirectoryW(MAX_PATH, getcwd_buffer);
+
+  // check if we have been able to get the current working directory
+  if (getcwd_result == 0) {
+    // meaning we failed to get the current working directory
+    fprintf(stderr, "\nFailed to get current working directory!\n");
     fflush(stderr);
+
+    // exit the function with an error
     return 1;
   }
 
-  // If the buffer is too small, the return value is the required size (in chars)
-  if (result >= MAX_PATH) {
-    fprintf(stderr, "\nFailed to get the current working directory %lu!\n", GetLastError());
+  // check if our ( result ) buffer is too small
+  if (getcwd_result >= MAX_PATH) {
+    fprintf(stderr, "\nGet current working directory buffer is too small!\n");
     fflush(stderr);
+
+    // exit the function with an error
     return 1;
   }
 
-  return 0;
-}
+  // display the current working directory
+  wprintf(L"\nCurrent Working Directory Buffer: %ls\n", getcwd_buffer);
 
-// function to combine 2 paths (wide)
-static int combine_path_w(
-  wchar_t result_fullpath[MAX_PATH],
-  const wchar_t *cwd_path,
-  const wchar_t *file_name
-) {
-  HRESULT hr = PathCchCombine(result_fullpath, MAX_PATH, cwd_path, file_name);
+  // part 2: combine the paths
 
+  // create a buffer to hold the full path
+  wchar_t fullpath[MAX_PATH] = {0};
+
+  // try to combine paths by calling function
+  HRESULT hr = PathCchCombine(fullpath, MAX_PATH, getcwd_buffer, filename);
+
+  // check if we have been able to combine the paths
   if (FAILED(hr)) {
-    fprintf(stderr, "\nFailed to combine paths (HRESULT=0x%08lx)\n", (unsigned long)hr);
+    // meaning that the paths were not able to be combined
+    fprintf(stderr, "\nFailed to combine paths ( Error Code: 0x%08lx )!\n", (unsigned long)hr);
     fflush(stderr);
+
+    // exit the function with an error
     return 1;
+  }
+
+  // display the full combined paths
+  wprintf(L"\nCombined Path Buffer: %ls\n", fullpath);
+
+  // part 3: check if the file actually exists in the directory
+
+  // try to check if file exists by calling function
+  DWORD attrs = GetFileAttributesW(fullpath);
+
+  // check if the file actually exists
+  if (attrs == INVALID_FILE_ATTRIBUTES) {
+    // meaning that the file does NOT exists
+    fprintf(stderr, "\nERROR: File does not exists!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  } else {
+    // meaning that the file does exists
+    printf("\nFile Attributes Checker: File does exists!\n");
+  }
+
+  // part 4: check if the file is an actual file or directory
+  if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
+    // meaning that its actually a directory
+    fprintf(stderr, "\nERROR: Path is a directory!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  } else {
+    // meaning that its actually a file
+    printf("\nFile Checker: Path is a file!\n");
   }
 
   return 0;
 }
 
 // our main function
-int main(void) {
-  wchar_t cwd_buf[MAX_PATH] = {0};
-
-  if (getcwd_w(cwd_buf) != 0) {
-    return 1;
-  }
-
-  // print the cwd (wide string)
-  wprintf(L"%ls\n", cwd_buf);
-
-  wchar_t fullpath_combined[MAX_PATH] = {0};
-
-  if (combine_path_w(fullpath_combined, cwd_buf, CSV_FILENAME) != 0) {
-    return 1;
-  }
-
-  wprintf(L"\n%ls\n\n", fullpath_combined);
-
-  // check if the fullpath is actually a file
-  DWORD attrs = GetFileAttributesW(fullpath_combined);
-
-  if (attrs == INVALID_FILE_ATTRIBUTES) {
-      fprintf(stderr, "GetFileAttributesW failed: %lu - Files does not exists!\n", GetLastError());
-      fflush(stderr);
-
-      return 1;
-  }
-
-  if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
-      wprintf(L"Path is a directory\n");
-      return 1;
-  }
-
-  wprintf(L"Path is a file\n");
+int main() {
+  // call the function to check if a file exists
+  check_file_existance(CSV_FILENAME);
 
   return 0;
 }
