@@ -1,11 +1,10 @@
 #include <pathcch.h>
-#include <profileapi.h>
 #include <stdio.h>
 #include <hidusage.h>
 #include <windows.h>
 
 // macro definition for how to long to run the program
-#define TIME_TO_RUN 10.0
+#define TIME_TO_RUN 60.0
 // macro definition for our CSV file name
 #define CSV_FILENAME "mouse_data.csv"
 // macro definition for our `graphs.exe` executable file name
@@ -136,6 +135,8 @@ int check_file_existence(const wchar_t *filename) {
     // meaning that its actually a file
     printf("\nFile Checker: Path is a file!\n");
   }
+
+  display_rule(50, '-');
 
   return 0;
 }
@@ -382,62 +383,69 @@ int main(void) {
 
   // start the file checking process
   display_rule(50, '=');
-  printf("\n\tC Program Starting File Checking Process\n");
+  printf("\n  C Program Starting File Checking Process\n");
   display_rule(50, '=');
 
   display_rule(50, '-');
 
   // check if the CSV file has been created under the current directory
-  check_file_existence(CSV_FILENAME_W);
+  if (check_file_existence(CSV_FILENAME_W) != 0) {
 
-  display_rule(50, '-');
-
-  // check if the CSV file has been downloaded and moved to the current ( working ) directory
-  check_file_existence(PYTHON_GRAPHS_FILENAME_W);
-
-  display_rule(50, '=');
-
-  // call the `graphs.exe` created by `pyinstaller` from the `main.py` file
-  // INFO: this calls the `graphs.exe` file which is going to search
-  // for our CSV file and then be able to generate the graphs in our downloads folder!
-
-  // create array for new process start-up and process information
-  // INFO: again, this is created / used for the `CreateProcessW` function
-  STARTUPINFOW si = {0};
-  PROCESS_INFORMATION pi = {0};
-
-  // find the size of the structure / array `si` --> for the startup information
-  si.cb = sizeof(si);
-
-  // create a new process and run `graphs.exe` in that process
-  if (!CreateProcessW(
-    // name of process / executable to run
-    PYTHON_GRAPHS_FILENAME_W,
-    NULL,
-    NULL,
-    NULL,
-    // does not inherit any handles
-    FALSE,
-    // no creation flags has been passed
-    0,
-    NULL,
-    NULL,
-    // start-up information
-    &si,
-    // process information
-    &pi
-  )) {
-    // meaning that the program `graphs.exe` was not found or something
-    fprintf(stderr, "\nFailed To Launch `graphs.exe`! Error: %lu\n", GetLastError());
+    // meaning our CSV file is not present
+    fprintf(stderr, "\nCSV File '%s' Missing - Cancelling Graphs Generation!\n", CSV_FILENAME);
     fflush(stderr);
 
-  } else {
-    // meaning that our `graphs.exe` as found ==> wait for it to complete
-    WaitForSingleObject(pi.hProcess, INFINITE);
+    // check if the CSV file has been downloaded and moved to the current ( working ) directory
+  } else if (check_file_existence(PYTHON_GRAPHS_FILENAME_W) != 0) {
 
-    // close the handle for the new process
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
+    // meaning our "Python" executable file is not present
+    fprintf(stderr, "\nPython Executable File '%ls' Missing - Cancelling Graphs Generation!\n", PYTHON_GRAPHS_FILENAME_W);
+    fflush(stderr);
+
+    // meaning that everything is present for graph generation
+  } else {
+    // call the `graphs.exe` created by `pyinstaller` from the `main.py` file
+    // INFO: this calls the `graphs.exe` file which is going to search
+    // for our CSV file and then be able to generate the graphs in our downloads folder!
+
+    // create array for new process start-up and process information
+    // INFO: again, this is created / used for the `CreateProcessW` function
+    STARTUPINFOW si = {0};
+    PROCESS_INFORMATION pi = {0};
+
+    // find the size of the structure / array `si` --> for the startup information
+    si.cb = sizeof(si);
+
+    // create a new process and run `graphs.exe` in that process
+    if (!CreateProcessW(
+      // name of process / executable to run
+      PYTHON_GRAPHS_FILENAME_W,
+      NULL,
+      NULL,
+      NULL,
+      // does not inherit any handles
+      FALSE,
+      // no creation flags has been passed
+      0,
+      NULL,
+      NULL,
+      // start-up information
+      &si,
+      // process information
+      &pi
+    )) {
+      // meaning that the program `graphs.exe` was not found or something
+      fprintf(stderr, "\nFailed To Launch `graphs.exe`! Error: %lu\n", GetLastError());
+      fflush(stderr);
+
+    } else {
+      // meaning that our `graphs.exe` as found ==> wait for it to complete
+      WaitForSingleObject(pi.hProcess, INFINITE);
+
+      // close the handle for the new process
+      CloseHandle(pi.hProcess);
+      CloseHandle(pi.hThread);
+    }
   }
 
   // destroy the hidden window that we created
