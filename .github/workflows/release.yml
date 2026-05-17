@@ -25,7 +25,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install Python dependencies
-        run: pip install matplotlib numpy pandas pyinstaller
+        run: |
+          pip install --upgrade pip
+          pip install matplotlib numpy pyinstaller
 
       - name: Install MSYS2
         run: choco install msys2 -y
@@ -34,7 +36,43 @@ jobs:
         run: make build
 
       - name: Build graphs.exe
-        run: pyinstaller --onefile --name graphs main.py
+        shell: powershell
+        run: |
+          pyinstaller --onefile `
+          --clean `
+          --strip `
+          --name graphs `
+          --hidden-import matplotlib.backends.backend_agg `
+          --exclude-module tkinter `
+          --exclude-module tcl `
+          --exclude-module _tkinter `
+          --exclude-module sqlite3 `
+          --exclude-module IPython `
+          --exclude-module jedi `
+          --exclude-module matplotlib.tests `
+          --exclude-module numpy.tests `
+          --exclude-module matplotlib.backends.backend_tkagg `
+          --exclude-module matplotlib.backends.backend_qt5agg `
+          --exclude-module matplotlib.backends.backend_pdf `
+          --exclude-module matplotlib.backends.backend_ps `
+          --exclude-module matplotlib.backends.backend_svg `
+          --exclude-module matplotlib.backends.backend_webagg `
+          --exclude-module notebook `
+          --exclude-module scipy `
+          --exclude-module xmlrpc `
+          --exclude-module email `
+          --exclude-module http `
+          --exclude-module PyQt5 `
+          --exclude-module PyQt6 `
+          --exclude-module PySide2 `
+          --exclude-module PySide6 `
+          main.py
+
+      - name: Show executable sizes
+        shell: powershell
+        run: |
+          Get-Item program.exe | Select-Object Name,Length
+          Get-Item dist/graphs.exe | Select-Object Name,Length
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
