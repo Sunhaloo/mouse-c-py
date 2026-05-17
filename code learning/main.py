@@ -8,15 +8,24 @@ from tkinter.constants import W
 # import the numpy library and use `np` as alias
 import numpy as np
 
+# import the whole 'matplotlib' module so as to change backend
+import matplotlib
+
+# WARNING: changing the backend used by matplotlib
+# this way, we are further optimising and improving reliability of
+# our program for CI/CD stuffs as we only save images
+# our program does not really open up the "Tkiner GUI" to see the image
+matplotlib.use("Agg")
+
+# import the 'matplotlib' module again but only to get graphs functions
+import matplotlib.pyplot as plt
+
 
 # define our constants
 CSV_FILENAME: str = "mouse_data.csv"
 BARCHART_IMG: str = "mouse_clicks_count.png"
 HEATMAP_IMG: str = "mouse_coords_heatmap.png"
-SAVE_IMG_DIR: str = "~/Downloads"
-
-# create a global dictionary to hold data required by matplotlib
-MOUSE_DATA_DICT: dict = {}
+SAVE_IMG_DIR: str = path.expanduser("~/Downloads/")
 
 
 # function to check if a file exists
@@ -50,9 +59,10 @@ def check_file_existence(filename: str) -> int:
 
 
 # function to read and gather required mouse data from CSV file
-def read_csv_file():
+def read_csv_file() -> dict:
   # open the CSV file for reading the data gathered
-  with open(CSV_FILENAME, 'r') as csv_file:
+  # NOTE: `newline=''` added as per the documentation
+  with open(CSV_FILENAME, 'r', newline='') as csv_file:
     # use the `DictReader` function / method to read data as a directionary
     mouse_data_reader = csv.DictReader(csv_file)
 
@@ -60,8 +70,8 @@ def read_csv_file():
     # INFO: Python list's `.append` function is O(1) compared to numpy's O(n)
     # this is due to the fact that Python lists are dynamic while numpy's are fixed length
     # meaning that it has to do the C thing of creating a temporary array etc...
-    coord_x: list[int] = []
-    coord_y: list[int] = []
+    coords_x: list[int] = []
+    coords_y: list[int] = []
     left: list[int] = []
     right: list[int] = []
     middle: list[int] = []
@@ -73,8 +83,8 @@ def read_csv_file():
     # extract the required data from CSV file as lists
     for row in mouse_data_reader:
       # extract the actual coordinates gathered
-      coord_x.append(int(row["x"]))
-      coord_y.append(int(row["y"]))
+      coords_x.append(int(row["x"]))
+      coords_y.append(int(row["y"]))
 
       # extract the different "click" and "scroll" gathered
       left.append(int(row["left"]))
@@ -88,8 +98,8 @@ def read_csv_file():
   # convert Python lists into numpy's array
   # INFO: I would have loved to add 'type annotations'
   # but then I would have import another thing from numpy
-  coord_x = np.array(coord_x)
-  coord_y = np.array(coord_y)
+  coords_x = np.array(coords_x)
+  coords_y = np.array(coords_y)
   left = np.array(left)
   right = np.array(right)
   middle = np.array(middle)
@@ -109,11 +119,60 @@ def read_csv_file():
     np.sum(scroll_down),
   ]
 
-  # add to global dictionary for easier return ( for the current function )
-  # and also for each of access and use in the different "matplotlib" functions
-  MOUSE_DATA_DICT['x_coordinates'] = coord_x
-  MOUSE_DATA_DICT['y_coordinates'] = coord_y
-  MOUSE_DATA_DICT["counts"] = mouse_click_scroll_count
+  # return the data gathered as a dictionary
+  return {
+    "x_coordinates": coords_x,
+    "y_coordinates": coords_y,
+    "button_click_scroll_count": mouse_click_scroll_count
+  }
+
+# function to be able to generate the heatmap graph
+def heatmap_generation(coords_x, coords_y):
+  # create the figure and the axes
+  fig, axes = plt.subplots()
+
+  # move the x-axis from the bottom to the top
+  axes.spines["bottom"].set_position(("axes", 1.0))
+
+  # make the x-axis "ticks" and labels appear at the top
+  axes.xaxis.set_ticks_position("top")
+  axes.xaxis.set_label_position("top")
+
+  # add more description to the graph / image
+  axes.set_title("Mouse Movement Heatmap ( Screen Representation )")
+
+  # label the axes
+  axes.set_xlabel("X coordinate")
+  axes.set_ylabel("Y coordinate")
+
+  # get the data to compute the histogram
+  # NOTE: `xedges` and `yedges` are arrays and the `heatmap` is a 2D-array
+  heatmap, xedges, yedges = np.histogram2d(coords_x, coords_y, bins=30)
+
+  # move the origin to the top-left corner of the screen to match screen
+  image = axes.imshow(
+      # transpose the array
+      heatmap.T,
+      # set the origin to the top-left corner
+      origin="upper",
+      # stretch to fill the axes
+      aspect="auto",
+      # get the actual data coordinates
+      extent=[xedges[0], xedges[-1], yedges[-1], yedges[0]],
+  )
+
+  # create a colour bar to show activity level "key"
+  fig.colorbar(image, ax=axes)
+
+  # make sure that nothing is cut off
+  fig.tight_layout()
+
+  # save the image to the downloads directory / folder
+  fig.savefig(
+      SAVE_IMG_DIR + HEATMAP_IMG,
+      dpi=600,
+      bbox_inches="tight",
+  )
 
 
 # our main function
@@ -138,8 +197,12 @@ def main():
   print("\n" + "=" * 50, "\n")
 
   # call the function to read data from the CSV file and populate dictionary
-  read_csv_file()
+  mouse_data_dict = read_csv_file()
 
+  print(mouse_data_dict["x_coordinates"])
+
+  # call the function to generate our heatmap graph
+  heatmap_generation(mouse_data_dict["x_coordinates"], mouse_data_dict["y_coordinates"])
 
 # source the main function
 if __name__ == "__main__":
