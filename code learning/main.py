@@ -3,7 +3,6 @@ from os import getcwd, path
 
 # import the 'csv' module that is built into Python
 import csv
-from tkinter.constants import W
 
 # import the numpy library and use `np` as alias
 import numpy as np
@@ -126,7 +125,7 @@ def read_csv_file() -> dict:
     "button_click_scroll_count": mouse_click_scroll_count
   }
 
-# function to be able to generate the heatmap graph
+# function to generate the heatmap graph
 def heatmap_generation(coords_x, coords_y):
   # create the figure and the axes
   fig, axes = plt.subplots()
@@ -175,6 +174,38 @@ def heatmap_generation(coords_x, coords_y):
   )
 
 
+
+# function to generate the barchart graph
+def barchart_generation(button_data):
+  # create the figure and the axes
+  fig, axes = plt.subplots()
+  # create the x-axis ==> writing the label for each bar
+  mouse_buttons = [
+      "Left Click",
+      "Right Click",
+      "Middle Click",
+      "Back ( Mouse 4 )",
+      "Forward ( Mouse 5 )",
+      "Scroll-Up",
+      "Scroll-Down",
+  ]
+  # add more description to the graph / image
+  axes.set_ylabel("Click Counts")
+  axes.set_title("Number of times mouse buttons clicked")
+
+  # create the actual barchart graph using `axes`
+  axes.bar(mouse_buttons, button_data)
+
+  # rotate the labels
+  plt.xticks(rotation=30, ha="right")
+
+  # make sure that nothing is cut off
+  fig.tight_layout()
+
+  # save the image to the downloads directory / folder
+  fig.savefig(SAVE_IMG_DIR + BARCHART_IMG, dpi=600, bbox_inches="tight")
+
+
 # our main function
 def main():
   # display a little message that the Python program is starting
@@ -199,10 +230,11 @@ def main():
   # call the function to read data from the CSV file and populate dictionary
   mouse_data_dict = read_csv_file()
 
-  print(mouse_data_dict["x_coordinates"])
-
   # call the function to generate our heatmap graph
   heatmap_generation(mouse_data_dict["x_coordinates"], mouse_data_dict["y_coordinates"])
+
+  # call the function to generate our barchart graph
+  barchart_generation(mouse_data_dict["button_click_scroll_count"])
 
 # source the main function
 if __name__ == "__main__":
