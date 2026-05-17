@@ -4088,8 +4088,422 @@ fprintf(stderr, "\nFailed to get raw input data! Error: %lu\n", GetLastError());
 fflush(stderr);
 ```
 
+### Function To Check If A File
+
+> [!INFO] Resource(s)
+> 
+> - `GetCurrentDirectory`: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getcurrentdirectory
+> - `PathCombineW`: https://learn.microsoft.com/en-us/windows/win32/api/shlwapi/nf-shlwapi-pathcombinew
+> 	- `PathCchCombine`: https://learn.microsoft.com/en-us/windows/win32/api/pathcch/nf-pathcch-pathcchcombine
+> - `GetFileAttributesW`: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfileattributesw
+
+I am now going to take Claude Haiku's advice and make a file checker function that is going to take a file name as argument and then check if that file name is present inside the current working directory.
+
+> [!INFO]
+> The function below is simply for me to learn about `os.path.getcwd`, `os.path.join` and `os.path.isfile` from Python but in C
+
+> [!WARNING]
+> The code below was written in a separate `test.c` file...
+> 
+> > I have yet to implement it inside our `main.c` code!
+
+```C
+#include <fileapi.h>
+#include <processenv.h>
+#include <windows.h>
+#include <pathcch.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <wingdi.h>
+#include <winnt.h>
+
+#define CSV_FILENAME L"mouse_data.csv"
+#define EXE_FILENAME L"graphs.exe"
+
+// function to check if a file exists
+int check_file_existance(const wchar_t *filename) {
+  // part 1: get the current working directory
+
+  // create the buffer to hold current working directory
+  wchar_t getcwd_buffer[MAX_PATH];
+
+  // try to get the current working directory by calling function
+  DWORD getcwd_result = GetCurrentDirectoryW(MAX_PATH, getcwd_buffer);
+
+  // check if we have been able to get the current working directory
+  if (getcwd_result == 0) {
+    // meaning we failed to get the current working directory
+    fprintf(stderr, "\nFailed to get current working directory!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  }
+
+  // check if our ( result ) buffer is too small
+  if (getcwd_result >= MAX_PATH) {
+    fprintf(stderr, "\nGet current working directory buffer is too small!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  }
+
+  // display the current working directory
+  wprintf(L"\nCurrent Working Directory Buffer: %ls\n", getcwd_buffer);
+
+  // part 2: combine the paths
+
+  // create a buffer to hold the full path
+  wchar_t fullpath[MAX_PATH] = {0};
+
+  // try to combine paths by calling function
+  HRESULT hr = PathCchCombine(fullpath, MAX_PATH, getcwd_buffer, filename);
+
+  // check if we have been able to combine the paths
+  if (FAILED(hr)) {
+    // meaning that the paths were not able to be combined
+    fprintf(stderr, "\nFailed to combine paths ( Error Code: 0x%08lx )!\n", (unsigned long)hr);
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  }
+
+  // display the full combined paths
+  wprintf(L"\nCombined Path Buffer: %ls\n", fullpath);
+
+  // part 3: check if the file actually exists in the directory
+
+  // try to check if file exists by calling function
+  DWORD attrs = GetFileAttributesW(fullpath);
+
+  // check if the file actually exists
+  if (attrs == INVALID_FILE_ATTRIBUTES) {
+    // meaning that the file does NOT exists
+    fprintf(stderr, "\nERROR: File does not exists!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  } else {
+    // meaning that the file does exists
+    printf("\nFile Attributes Checker: File does exists!\n");
+  }
+
+  // part 4: check if the file is an actual file or directory
+  if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
+    // meaning that its actually a directory
+    fprintf(stderr, "\nERROR: Path is a directory!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  } else {
+    // meaning that its actually a file
+    printf("\nFile Checker: Path is a file!\n");
+  }
+
+  return 0;
+}
+
+// our main function
+int main() {
+  // call the function to check if a file exists
+  check_file_existance(CSV_FILENAME);
+
+  return 0;
+}
+```
+
 ## Optimising Our Python File
 
+### Updated File Checker
+
+Here is our updated `check_file_existence` checker function:
+
+```python
+# function to check if a file exists
+def check_file_existence(filename: str) -> int:
+  # create the full file path ( current working directory + file name )
+  fullpath: str = path.join(getcwd(), filename)
+
+  # check if full path exists is actually a file
+
+  # NOTE: I know that these checks should have been in different `if` statements
+  # but given my use-case; I think is a good tradeoff
+  # INFO: today on 17/05/2025 @12:30... I tried creating a folder with the name `mouse_data.csv` file
+  # and I did not expect this; Windows DOES let you create folders with `.` in the name!
+  # thank god there is the `path.isfile` in Python!
+
+  if path.exists(fullpath) and path.isfile(fullpath):
+    print("\n" + "-" * 50, "\n")
+    print(f"\tFile '{CSV_FILENAME}' exists!")
+    print("\n" + "-" * 50, "\n")
+
+    return 0
+
+  # if the file has not been found!
+  else:
+    # INFO: again given my use-case whereby the `main.c` program is going to create a `mouse_data.csv` file
+    print("\n" + "-" * 50, "\n")
+    print(f"  File '{CSV_FILENAME}' does not exists or not a file!")
+    print("\n" + "-" * 50, "\n")
+
+    return 1
+```
+
+### Data Reading
+
+> [!INFO] Resource(s)
+> - Official Python Documentation: https://docs.python.org/3/library/csv.html#module-csv
+> - Corey Schafer: https://youtu.be/q5uM4VKywbA?si=GMb2jAiYs62ZEzbY
+> - Earthly: https://www.youtube.com/watch?v=H-hagjt65cE
+
+Like I have been saying above, I want to stop using `pandas` for the CSV file **reading** part so that our `graphs.exe` does not have a big file size!
+
+Therefore, I started watching Corey Schafer's video on CSV ( *I think it was 10 years ago... but still "Could be worst"* ).
+
+But then I realised that he is showing the basics of the basics like the `with` context in Python and how to also write data to a CSV file ( *with the actual `csv` module* ).
+
+Hence, I came across Earthly's video whereby he used something called the `DictReader`... Basically the `csv` module has **readers** and **writers** whereby it uses these *function* to be able to... Well *read* and *write* from / to a `.csv` file!
+
+> I do suggest reading the official Python documentation as it talks about the "*reader object*"!
+
+Therefore, this is the current program looks like:
+
+```python
+  # open the CSV file for reading the data gathered
+  with open(CSV_FILENAME, 'r') as csv_file:
+    # use the `DictReader` function / method to read data as a directionary
+    mouse_data_reader = csv.DictReader(csv_file)
+
+    # get the rows of the file
+    mouse_data_rows = list(mouse_data_reader)
+
+    # extract the required data from CSV file as lists
+
+    # extract the actual coordinates gathered
+    coord_x = [int(row["x"]) for row in mouse_data_rows]
+    coord_y = [int(row["y"]) for row in mouse_data_rows]
+
+    # extract the different "click" and "scroll" gathered
+    left = [int(row["left"]) for row in mouse_data_rows]
+    right = [int(row["right"]) for row in mouse_data_rows]
+    middle = [int(row["middle"]) for row in mouse_data_rows]
+    back = [int(row["back"]) for row in mouse_data_rows]
+    forward = [int(row["forward"]) for row in mouse_data_rows]
+    scroll_up = [int(row["scroll_up"]) for row in mouse_data_rows]
+    scroll_down = [int(row["scroll_down"]) for row in mouse_data_rows]
+
+    # create another array to sum-up those "click" and "scroll" data
+    mouse_click_scroll_count = [
+      sum(left),
+      sum(right),
+      sum(middle),
+      sum(back),
+      sum(forward),
+      sum(scroll_up),
+      sum(scroll_down),
+    ]
+```
+
+The above code basically read the whole `mouse_data.csv` file as a dictionary and then converts *that* data into a list whereby we iterate through that list **nine fucking times**.
+
+> [!NOTE]
+> The above code was kind-of created by Claude.
+> 
+> I am going to be honest with you; I did not tell it to create the code; actually for the first part Claude generated this:
+> 
+> ```python
+> import csv
+> 
+> # reading the CSV
+> with open(FILE_NAME, newline="") as f:
+>     reader = csv.DictReader(f)
+>     rows = list(reader)
+> 
+> # extracting columns as lists instead of Series
+> coords_x = [int(row["x"]) for row in rows]
+> coords_y = [int(row["y"]) for row in rows]
+> left     = [int(row["left"]) for row in rows]
+> # ... etc
+> ```
+> 
+> Very nice! This continued me to left my mind wander around and look at other resources. But then I provided it my initial code and then it gave me the above, "*full*", code block.
+> 
+> Now, talking back and forth about things like optimisation and stuff. The above code is kind-of shit because it loads in that whole `mouse_data.csv` file which could have more than 4000 lines of data and then we also do iterate over it **nine fucking times**.
+> 
+> Hence, I started asking for solutions and it says better to create those array first and then use `.append()` ( *as it has a time complexity of O(1)* ).
+> 
+> But then I started asking if that is really optimal and also asked it about Numpy. As for right now and even after this project finishes. I still have not dealt with Numpy as I would have liked to but I know that Numpy arrays are **super fast** and therefore its going to be more optimised if we used it!
+> 
+> > "But wait... Are you not are going to be increasing the size of `graphs.exe`?" I hear you ask!
+> 
+> The thing is `numpy` is already being installed and used as a **dependency** for `matplotlib`. Thus, in my eyes, it makes complete sense to use it!
+> 
+> > Therefore, I am going to now update the code so that we create a function for the "*gathering of data*" part and also use more optimise *stuffs*.
+
+#### Python CSV File Reading Function
+
+```python
+# function to read and gather required mouse data from CSV file
+def read_csv_file() -> dict:
+  # open the CSV file for reading the data gathered
+  # NOTE: `newline=''` added as per the documentation
+  with open(CSV_FILENAME, 'r', newline='') as csv_file:
+    # use the `DictReader` function / method to read data as a directionary
+    mouse_data_reader = csv.DictReader(csv_file)
+
+    # create the required Python lists
+    # INFO: Python list's `.append` function is O(1) compared to numpy's O(n)
+    # this is due to the fact that Python lists are dynamic while numpy's are fixed length
+    # meaning that it has to do the C thing of creating a temporary array etc...
+    coords_x: list[int] = []
+    coords_y: list[int] = []
+    left: list[int] = []
+    right: list[int] = []
+    middle: list[int] = []
+    back: list[int] = []
+    forward: list[int] = []
+    scroll_up: list[int] = []
+    scroll_down: list[int] = []
+
+    # extract the required data from CSV file as lists
+    for row in mouse_data_reader:
+      # extract the actual coordinates gathered
+      coords_x.append(int(row["x"]))
+      coords_y.append(int(row["y"]))
+
+      # extract the different "click" and "scroll" gathered
+      left.append(int(row["left"]))
+      right.append(int(row["right"]))
+      middle.append(int(row["middle"]))
+      back.append(int(row["back"]))
+      forward.append(int(row["forward"]))
+      scroll_up.append(int(row["scroll_up"]))
+      scroll_down.append(int(row["scroll_down"]))
+
+  # convert Python lists into numpy's array
+  # INFO: I would have loved to add 'type annotations'
+  # but then I would have import another thing from numpy
+  coords_x = np.array(coords_x)
+  coords_y = np.array(coords_y)
+  left = np.array(left)
+  right = np.array(right)
+  middle = np.array(middle)
+  back = np.array(back)
+  forward = np.array(forward)
+  scroll_up = np.array(scroll_up)
+  scroll_down = np.array(scroll_down)
+
+  # create another array to sum-up those "click" and "scroll" data
+  mouse_click_scroll_count = [
+    np.sum(left),
+    np.sum(right),
+    np.sum(middle),
+    np.sum(back),
+    np.sum(forward),
+    np.sum(scroll_up),
+    np.sum(scroll_down),
+  ]
+
+  # return the data gathered as a dictionary
+  return {
+    "x_coordinates": coords_x,
+    "y_coordinates": coords_y,
+    "button_click_scroll_count": mouse_click_scroll_count
+  }
+```
+
+Therefore the usage is now like so:
+
+```python
+  # inside of main somwhere down below
+  mouse_data_dict = read_csv_file()
+
+  # call the function to generate our heatmap graph
+  heatmap_generation(mouse_data_dict["x_coordinates"], mouse_data_dict["y_coordinates"])
+
+  # call the function to generate our barchart graph
+  barchart_generation(mouse_data_dict["button_click_scroll_count"])
+```
+
+### Pyinstaller Shit!
+
+Now, we are going to actually try to compile the **new** `graphs.exe` file and we should see that we have reduced size of it!
+
+So currently from above, we know that we have the following:
+
+```powershell
+pyinstaller --onedir `
+--exclude-module tkinter `
+--exclude-module tcl `
+--exclude-module _tkinter `
+--exclude-module sqlite3 `
+--exclude-module IPython `
+--exclude-module jedi `
+--exclude-module matplotlib.tests `
+--exclude-module numpy.tests `
+--name graphs `
+main.py
+```
+
+Then talking with Gemini again but specifically for Matplotlib module; it gave me the following command:
+
+```powershell
+pyinstaller --noconfirm --onefile --windowed `
+    --exclude-module tkinter `
+    --exclude-module _tkinter `
+    --exclude-module matplotlib.backends.backend_tkagg `
+    --exclude-module matplotlib.backends.backend_qt5agg `
+    --exclude-module notebook `
+    --exclude-module scipy `
+    main.py
+```
+
+Therefore, I am first going go learn more about the `--windowed` flag and see what it does!
+
+> [!INFO]
+> - https://pyinstaller.org/en/stable/operating-mode.html
+> 
+> The `--windowed` flag, from what I can see, it going to not show up any **console** window!
+
+Therefore, right now, I am going **combine** the above command and we see what will happen!
+
+```powershell
+pyinstaller --onefile `
+--name graphs `
+--exclude-module tkinter `
+--exclude-module tcl `
+--exclude-module _tkinter `
+--exclude-module sqlite3 `
+--exclude-module IPython `
+--exclude-module jedi `
+--exclude-module matplotlib.tests `
+--exclude-module numpy.tests `
+--exclude-module matplotlib.backends.backend_tkagg `
+--exclude-module matplotlib.backends.backend_qt5agg `
+--exclude-module notebook `
+--exclude-module scipy `
+--exclude-module pillow `
+--exclude-module matplotlib.backends.backend_pdf `
+--exclude-module matplotlib.backends.backend_ps `
+--exclude-module matplotlib.backends.backend_svg `
+--exclude-module matplotlib.backends.backend_webagg `
+--exclude-module xmlrpc `
+--exclude-module email `
+--exclude-module http `
+main.py
+```
+
+> [!INFO]
+> I did ask Claude to give me more things to `exclude`.
+
+> [!SUCCESS]
+> Our `graphs.exe` file is now 33.8 MB...
+> 
+> > Fuck Yeah.
 
 ---
 
