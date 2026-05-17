@@ -41,8 +41,20 @@ POINT coordinates;
 // FILE pointer for writing mouse data to CSV file
 FILE *csv_file;
 
+// simple function to display a horizontal rule based on the character provided
+void display_rule(int length, char character) {
+  printf("\n");
+
+  // iterate through the length given and display character
+  for (int i = 0; i < length; i++) {
+    printf("%c", character);
+  }
+
+  printf("\n");
+}
+
 // function to check if a file is present under the current working directory
-int check_file_existance(const wchar_t *filename) {
+int check_file_existence(const wchar_t *filename) {
   // part 1: get the current working directory
 
   // create the buffer to hold current working directory
@@ -238,6 +250,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 // FUN FACT: if you are not using "inline" arguments from the terminal
 // instead of using `int argc, char *argv[]` ==> simply use `void` instead
 int main(void) {
+  // display a little message that the C program is starting
+  display_rule(50, '=');
+  printf("\n\t\tC Program Starting\n");
+  display_rule(50, '=');
+
   // variable to keep the elapsed time
   double elapsed_time = 0;
 
@@ -320,6 +337,8 @@ int main(void) {
   // write the header for the CSV file
   fprintf(csv_file, "x,y,left,right,middle,back,forward,scroll_up,scroll_down\n");
 
+  display_rule(50, '-');
+
   // iterate through the `while` loop indefinitely
   while (1) {
     // get the messages from the queue
@@ -338,7 +357,7 @@ int main(void) {
     // calaculate the remaining time before the program ends
     double remaining = TIME_TO_RUN - elapsed_time;
 
-    printf("\rRecording mouse data... Time remaining: %.1f seconds ", remaining);
+    printf("\rRecording Mouse Data | Time Remaining: %.1f s", remaining);
 
     // NOTE: flushing directly to the screen as we are inside a `while` loop
     fflush(stdout);
@@ -353,17 +372,30 @@ int main(void) {
     Sleep(CSV_POLLING_WRITING_INTERVAL);
   }
 
+  display_rule(50, '-');
+
   // change the --> for aesthetic purposes
   printf("\n");
 
   // close the file to free up memory
   fclose(csv_file);
 
+  // start the file checking process
+  display_rule(50, '=');
+  printf("\n\tC Program Starting File Checking Process\n");
+  display_rule(50, '=');
+
+  display_rule(50, '-');
+
   // check if the CSV file has been created under the current directory
-  check_file_existance(CSV_FILENAME_W);
+  check_file_existence(CSV_FILENAME_W);
+
+  display_rule(50, '-');
 
   // check if the CSV file has been downloaded and moved to the current ( working ) directory
-  check_file_existance(PYTHON_GRAPHS_FILENAME_W);
+  check_file_existence(PYTHON_GRAPHS_FILENAME_W);
+
+  display_rule(50, '=');
 
   // call the `graphs.exe` created by `pyinstaller` from the `main.py` file
   // INFO: this calls the `graphs.exe` file which is going to search
@@ -413,7 +445,10 @@ int main(void) {
   // unregister the window class
   UnregisterClassW(L"RawInputWindow", GetModuleHandleW(NULL));
 
-  printf("Program Exiting... Thank You!\n");
+  // display a little message that the C program is exiting
+  display_rule(50, '=');
+  printf("\n\t\tC Program Exiting\n");
+  display_rule(50, '=');
 
   return 0;
 }
