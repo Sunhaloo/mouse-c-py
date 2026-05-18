@@ -40,7 +40,6 @@ jobs:
         run: |
           pyinstaller --onefile `
           --clean `
-          --strip `
           --name graphs `
           --hidden-import matplotlib.backends.backend_agg `
           --exclude-module tkinter `
