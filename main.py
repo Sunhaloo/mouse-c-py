@@ -7,6 +7,9 @@ import csv
 # import the numpy library and use `np` as alias
 import numpy as np
 
+# import the C low-level module to access 'Win32' API stuff
+import ctypes
+
 # import the whole 'matplotlib' module so as to change backend
 import matplotlib
 
@@ -24,7 +27,7 @@ import matplotlib.pyplot as plt
 CSV_FILENAME: str = "mouse_data.csv"
 BARCHART_IMG: str = "mouse_clicks_count.png"
 HEATMAP_IMG: str = "mouse_coords_heatmap.png"
-SAVE_IMG_DIR: str = path.expanduser("~/Downloads/")
+SAVE_IMG_DIR: str = path.expanduser("~\\Downloads\\")
 
 
 # function to check if a file exists
@@ -125,10 +128,27 @@ def read_csv_file() -> dict:
     "button_click_scroll_count": mouse_click_scroll_count
   }
 
+
+# function to get the user's screen resolution as a tuple
+def get_user_screen_resolution():
+  # INFO: for more information about this function
+  # please do head to the shitty Microsoft Windows Win32 API docs
+
+  # ignore display scaling ==> get the actual pixel coordinates of the screen
+  ctypes.windll.user32.SetProcessDpiAwarenessContext(-4)
+
+  # get the width and height of the user's screen
+  width = ctypes.windll.user32.GetSystemMetrics(0)
+  height = ctypes.windll.user32.GetSystemMetrics(1)
+
+  # return the values as a tuple
+  return width, height
+
+
 # function to generate the heatmap graph
 def heatmap_generation(coords_x, coords_y):
   # create the figure and the axes
-  fig, axes = plt.subplots()
+  fig, axes = plt.subplots(figsize=(12.8, 7.2))
 
   # move the x-axis from the bottom to the top
   axes.spines["bottom"].set_position(("axes", 1.0))
@@ -144,9 +164,18 @@ def heatmap_generation(coords_x, coords_y):
   axes.set_xlabel("X coordinate")
   axes.set_ylabel("Y coordinate")
 
+
+  # call the function to get the user's screen resolution
+  screen_resolution = get_user_screen_resolution()
+
   # get the data to compute the histogram
   # NOTE: `xedges` and `yedges` are arrays and the `heatmap` is a 2D-array
-  heatmap, xedges, yedges = np.histogram2d(coords_x, coords_y, bins=30)
+  heatmap, xedges, yedges = np.histogram2d(
+    coords_x,
+    coords_y,
+    bins=60,
+    range=[[0, screen_resolution[0]], [0, screen_resolution[1]]]
+  )
 
   # move the origin to the top-left corner of the screen to match screen
   image = axes.imshow(
@@ -157,7 +186,7 @@ def heatmap_generation(coords_x, coords_y):
       # stretch to fill the axes
       aspect="auto",
       # get the actual data coordinates
-      extent=[xedges[0], xedges[-1], yedges[-1], yedges[0]],
+      extent=[0, screen_resolution[0], screen_resolution[1], 0],
   )
 
   # create a colour bar to show activity level "key"
@@ -174,11 +203,11 @@ def heatmap_generation(coords_x, coords_y):
   )
 
 
-
 # function to generate the barchart graph
 def barchart_generation(button_data):
   # create the figure and the axes
   fig, axes = plt.subplots()
+
   # create the x-axis ==> writing the label for each bar
   mouse_buttons = [
       "Left Click",
@@ -233,8 +262,18 @@ def main():
   # call the function to generate our heatmap graph
   heatmap_generation(mouse_data_dict["x_coordinates"], mouse_data_dict["y_coordinates"])
 
+  print(f"Heatmap Succesfully Created ( '{SAVE_IMG_DIR + HEATMAP_IMG}' )!")
+
+  print("\n" + "-" * 50, "\n")
+
   # call the function to generate our barchart graph
   barchart_generation(mouse_data_dict["button_click_scroll_count"])
+
+  print(f"Barchart Succesfully Created ( '{SAVE_IMG_DIR + BARCHART_IMG}' )!")
+
+  print("\n" + "=" * 50, "\n")
+  print(f"\t    Python Program Ending")
+  print("\n" + "=" * 50, "\n")
 
 # source the main function
 if __name__ == "__main__":
