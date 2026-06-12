@@ -31,19 +31,33 @@ int main(void) {
   bool isDarkTheme = false;
 
   while (!WindowShouldClose()) {
-    // create variable to hold button theme text depending on theme
+    // create constant to hold button theme text depending on theme
     const char *buttonThemeTxt = isDarkTheme ? "Ligh Theme" : "Dark Theme";
 
-    // measure the size of the text dynamically
-    float textWidth = MeasureText(buttonThemeTxt, fontSize);
+    // measure the size of the theme button text dynamically
+    float themeBtnWidth = MeasureText(buttonThemeTxt, fontSize);
 
     // setup button padding
-    float buttonWidth = textWidth + 20.0f;
-    float buttonHeight = fontSize + 10.0f;
+    float buttonPadWidth = themeBtnWidth + 20.0f;
+    float buttonPadHeight = fontSize + 10.0f;
 
     // setup button positioning
-    float buttonPosX = SCREEN_WIDTH - buttonWidth - 10.0f;
+    float buttonPosX = SCREEN_WIDTH - buttonPadWidth - 10.0f;
     float buttonPosY = 10.0f;
+
+    // create constant to hold main label title
+   const char *mainLabelTitle = "Mouse Coordinates Logger and Heatmap Generator";
+
+   // measure the size of the main label text dynamically
+   float mainLblWidth = MeasureText(mainLabelTitle, fontSize);
+
+   // setup main lable padding
+   float mainPadLblWidth = mainLblWidth + 10.0f;
+   float mainPadLblHeight = fontSize + 8.0f;
+
+   // setup main label title positioning
+   float mainLblX = (SCREEN_WIDTH / 2.0f) - (mainLblWidth / 2.0f);
+   float mainLblY = (SCREEN_HEIGHT / 2.0f) - (fontSize / 2.0f);
 
     // start drawing stuff inside the window created
     BeginDrawing();
@@ -55,7 +69,7 @@ int main(void) {
     ClearBackground(currentTheme);
 
     // create our theme switcher button
-    if (GuiButton((Rectangle){buttonPosX, buttonPosY, buttonWidth, buttonHeight}, buttonThemeTxt)) {
+    if (GuiButton((Rectangle){buttonPosX, buttonPosY, buttonPadWidth, buttonPadHeight}, buttonThemeTxt)) {
       // button pressed ==> swap the status check
       isDarkTheme = !isDarkTheme;
 
@@ -73,6 +87,9 @@ int main(void) {
       // set the font size to desired size
       GuiSetStyle(DEFAULT, TEXT_SIZE, fontSize);
     }
+
+    // create main title label
+    GuiLabel((Rectangle){mainLblX, mainLblY, mainPadLblWidth, mainPadLblHeight}, mainLabelTitle);
 
     // drawing finishes ==> end the drawing
     EndDrawing();
