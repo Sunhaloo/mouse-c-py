@@ -1448,7 +1448,7 @@ typedef enum { BORDER = 0, BASE, TEXT, OTHER } GuiPropertyElement;
 static GuiState guiState = STATE_NORMAL;        // Gui global state, if !STATE_NORMAL, forces defined state
 
 static Font guiFont = { 0 };                    // Gui current font (WARNING: highly coupled to raylib)
-sconst tatic bool guiLocked = false;                  // Gui lock state (no inputs processed)
+static bool guiLocked = false;                  // Gui lock state (no inputs processed)
 static float guiAlpha = 1.0f;                   // Gui controls transparency
 
 static unsigned int guiIconScale = 1;           // Gui icon default scale (if icons enabled)
