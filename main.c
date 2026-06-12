@@ -4,7 +4,7 @@
 #include <windows.h>
 
 // macro definition for how to long to run the program
-#define TIME_TO_RUN 60.0
+#define TIME_TO_RUN 60.00
 // macro definition for our CSV file name
 #define CSV_FILENAME "mouse_data.csv"
 // macro definition for our `graphs.exe` executable file name
