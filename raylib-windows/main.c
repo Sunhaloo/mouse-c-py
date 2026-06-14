@@ -67,7 +67,7 @@ int main(void) {
    float mainPadLblHeight = mainTitleFontSize + 6.0f;
 
    // setup main label title positioning
-   float mainLblX = (SCREEN_WIDTH / 2.0f) - (mainLblWidth / 2.0f);
+   float mainLblX = (SCREEN_WIDTH / 2.0f) - (mainLblWidth / 2.0f) + 20.0f;
    float mainLblY = (SCREEN_HEIGHT / 2.0f) - (mainTitleFontSize / 2.0f) - 120.0f;
 
    // create constant to hold left and right text of slider bar
@@ -136,6 +136,14 @@ int main(void) {
    float sliderResetButtonPosX = (SCREEN_WIDTH / 2.0f) - (sliderResetBtnWidth / 2.0f);
    float sliderResetButtonPosY = (SCREEN_HEIGHT / 2.0f) - (globalFontSize / 2.0f);
 
+   // setup information rectangle size
+   float infoRectangleWidth = 600.0f;
+   float infoRectangleHeight = 80.0f;
+
+   // setup information rectangle positioning
+   float infoRectanglePosX = (SCREEN_WIDTH / 2.0f) - (infoRectangleWidth / 2.0f); // INFO: not currently being used
+   float infoRectanglePosY = (SCREEN_HEIGHT / 2.0f) - (infoRectangleHeight / 2.0f) + 80.0f;
+
    // start drawing stuff inside the window created
    BeginDrawing();
 
@@ -195,7 +203,8 @@ int main(void) {
    }
 
    // create the rectangle
-   GuiDrawRectangle((Rectangle){(SCREEN_WIDTH / 2.0f) - (420.0f / 2.0f), (SCREEN_HEIGHT / 2.0f) - (50.0f / 2.0f), 420.0f, 50.0f}, 2, LIME, BLANK);
+   // GuiDrawRectangle((Rectangle){infoRectanglePosX, infoRectanglePosY, infoRectangleWidth, infoRectangleHeight}, 2, LIME, BLANK);
+   GuiDrawRectangle((Rectangle){stopButtonPosX, infoRectanglePosY, infoRectangleWidth, infoRectangleHeight}, 2, LIME, BLANK);
 
    // create the stop logging button
    if (GuiButton((Rectangle){stopButtonPosX, stopButtonPosY, stopButtonPadWidth, stopButtonPadHeight}, buttonStopTxt)) {}
