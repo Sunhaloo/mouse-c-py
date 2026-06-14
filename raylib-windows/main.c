@@ -28,6 +28,12 @@ int main(void) {
 
   // set the font size to desired size
   GuiSetStyle(DEFAULT, TEXT_SIZE, globalFontSize);
+  // set global button normal colour
+  GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(BLACK));
+  // set global button hover colour
+  GuiSetStyle(DEFAULT, TEXT_COLOR_FOCUSED, ColorToInt(GREEN));
+  // set global button pressed colour
+  GuiSetStyle(DEFAULT, TEXT_COLOR_PRESSED, ColorToInt(RED));
 
   // variable to hold status flag for theme switching
   bool isDarkTheme = false;
@@ -42,13 +48,13 @@ int main(void) {
     // measure the size of the theme button text dynamically
     float themeBtnWidth = MeasureText(buttonThemeTxt, globalFontSize);
 
-    // setup button padding
-    float buttonPadWidth = themeBtnWidth + 20.0f;
-    float buttonPadHeight = globalFontSize + 10.0f;
+    // setup theme button padding
+    float themeButtonPadWidth = themeBtnWidth + 20.0f;
+    float themeButtonPadHeight = globalFontSize + 10.0f;
 
-    // setup button positioning
-    float buttonPosX = SCREEN_WIDTH - buttonPadWidth - 10.0f;
-    float buttonPosY = 10.0f;
+    // setup theme button positioning
+    float themeButtonPosX = SCREEN_WIDTH - themeButtonPadWidth - 10.0f;
+    float themeButtonPosY = 10.0f;
 
     // create constant to hold main label title
    const char *mainLabelTitle = "Mouse Coordinates Logger and Heatmap Generator";
@@ -88,6 +94,34 @@ int main(void) {
    float sliderBarX = sliderBarRenderingStartPos + leftSliderTxtWidth + sliderTextPadding;
    float sliderBarY = (SCREEN_HEIGHT / 2.0f) - (globalFontSize / 2.0f) - 50.0;
 
+   // create constant to hold button stop text
+   const char *buttonStopTxt = "Stop Logging";
+
+   // measure the size of the stop logging button
+   float stopBtnWidth = MeasureText(buttonStopTxt, globalFontSize);
+
+   // setup stop logging button padding
+   float stopButtonPadWidth = stopBtnWidth + 20.0f;
+   float stopButtonPadHeight = globalFontSize + 10.0f;
+
+   // setup stop logging button positioning
+   float stopButtonPosX = 100.0f;
+   float stopButtonPosY = SCREEN_HEIGHT - stopButtonPadHeight - 10.0f;
+
+   // create constant to hold button start text
+   const char *buttonStartTxt = "Start Logging";
+
+   // measure the size of the start logging button
+   float startBtnWidth = MeasureText(buttonStartTxt, globalFontSize);
+
+   // setup start logging button padding
+   float startButtonPadWidth = startBtnWidth + 20.0f;
+   float startButtonPadHeight = globalFontSize + 10.0f;
+
+   // setup the start logging button positioning
+   float startButtonPosX = SCREEN_WIDTH - startButtonPadWidth - 110.0f;
+   float startButtonPosY = stopButtonPosY;
+
     // start drawing stuff inside the window created
     BeginDrawing();
 
@@ -98,7 +132,7 @@ int main(void) {
     ClearBackground(currentTheme);
 
     // create our theme switcher button
-    if (GuiButton((Rectangle){buttonPosX, buttonPosY, buttonPadWidth, buttonPadHeight}, buttonThemeTxt)) {
+    if (GuiButton((Rectangle){themeButtonPosX, themeButtonPosY, themeButtonPadWidth, themeButtonPadHeight}, buttonThemeTxt)) {
       // button pressed ==> swap the status check
       isDarkTheme = !isDarkTheme;
 
@@ -107,14 +141,25 @@ int main(void) {
         // change the theme to dark
         GuiLoadStyle("style_dark.rgs");
 
+        // set global button normal colour
+        GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(WHITE));
+
       // if we are currently on dark theme
       } else {
         // change theme to light ==> use raylib's default styling
         GuiLoadStyleDefault();
+
+        // set global button normal colour
+        GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(BLACK));
       }
 
+      // NOTE: we need to do this again due to theme switcher reloading everything to default using `GuiLoadStyleDefaultj`
       // set the font size to desired size
       GuiSetStyle(DEFAULT, TEXT_SIZE, globalFontSize);
+      // set global button hover colour
+      GuiSetStyle(DEFAULT, TEXT_COLOR_FOCUSED, ColorToInt(GREEN));
+      // set global button pressed colour
+      GuiSetStyle(DEFAULT, TEXT_COLOR_PRESSED, ColorToInt(RED));
     }
 
     // change the font size ==> immediate mode GUI --> we need to do this
@@ -128,6 +173,12 @@ int main(void) {
 
     // create slider bar for amount of time to log mouse coordinates
     GuiSliderBar((Rectangle){sliderBarX, sliderBarY, sliderBarDragWidth, sliderBarDragHeight}, leftSliderTxt, TextFormat("%0.2f", loggingSliderTime), &loggingSliderTime, 60, 3600);
+
+    // create the stop logging button
+    if (GuiButton((Rectangle){stopButtonPosX, stopButtonPosY, stopButtonPadWidth, stopButtonPadHeight}, buttonStopTxt)) {}
+
+    // create the start logging button
+    if (GuiButton((Rectangle){startButtonPosX, startButtonPosY, startButtonPadWidth, startButtonPadHeight}, buttonStartTxt)) {}
 
     // drawing finishes ==> end the drawing
     EndDrawing();
