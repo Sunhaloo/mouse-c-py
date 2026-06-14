@@ -105,7 +105,7 @@ int main(void) {
    float stopButtonPadHeight = globalFontSize + 10.0f;
 
    // setup stop logging button positioning
-   float stopButtonPosX = 100.0f;
+   float stopButtonPosX = 92.0f;
    float stopButtonPosY = SCREEN_HEIGHT - stopButtonPadHeight - 10.0f;
 
    // create constant to hold button start text
@@ -119,7 +119,7 @@ int main(void) {
    float startButtonPadHeight = globalFontSize + 10.0f;
 
    // setup the start logging button positioning
-   float startButtonPosX = SCREEN_WIDTH - startButtonPadWidth - 110.0f;
+   float startButtonPosX = SCREEN_WIDTH - startButtonPadWidth - 116.0f;
    float startButtonPosY = stopButtonPosY;
 
    // create constant to hold button reset slider text
@@ -193,6 +193,9 @@ int main(void) {
      // simply reset the actual current value for the slider bar for next "rendering frame"
      loggingSliderTime = 60.00f;
    }
+
+   // create the rectangle
+   GuiDrawRectangle((Rectangle){(SCREEN_WIDTH / 2.0f) - (420.0f / 2.0f), (SCREEN_HEIGHT / 2.0f) - (50.0f / 2.0f), 420.0f, 50.0f}, 2, LIME, BLANK);
 
    // create the stop logging button
    if (GuiButton((Rectangle){stopButtonPosX, stopButtonPosY, stopButtonPadWidth, stopButtonPadHeight}, buttonStopTxt)) {}
