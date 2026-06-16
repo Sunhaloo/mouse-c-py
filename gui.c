@@ -1,220 +1,241 @@
-// include the actual raylib "functions", etc
 #include "include/raylib.h"
-
-// include the actual raygui "functions", etc
 #define RAYGUI_IMPLEMENTATION
 #include "include/raygui.h"
 
-// define our window size
+#include "win32_input.h"
+
+// use `enums` for the "state machine"
+typedef enum {
+  STATE_IDLE,
+  STATE_LOGGING,
+  STATE_GENERATING,
+  STATE_DONE,
+  STATE_STOPPED,
+} AppState;
+
+// define window size
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 400
 
 // our main function
 int main(void) {
-  // title for our window
-  const char *windowTitle = "mouse-c-py";
+  // initialise Raylib window first
+  InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "mouse-c-py");
 
-  // initialise the main window rendered out by Windows
-  InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, windowTitle);
+  // set the FPS to a smooth 60 ( not as smooth if you have higher hertz )
+  SetTargetFPS(60);
 
-  // set the target to 30
-  SetTargetFPS(30);
+  // setup Win32 raw input
+  if (win32_setup() != 0) {
+    CloseWindow();
+    return 1;
+  }
 
-  // change the global font size to 20
+  // setup font size
   float globalFontSize = 20.0f;
-  // font size for the main title label
   float mainTitleFontSize = 28.0f;
 
-  // set the font size to desired size
+  // setup styling ( global styling )
   GuiSetStyle(DEFAULT, TEXT_SIZE, globalFontSize);
-  // set global button normal colour
   GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(BLACK));
-  // set global button hover colour
   GuiSetStyle(DEFAULT, TEXT_COLOR_FOCUSED, ColorToInt(GREEN));
-  // set global button pressed colour
   GuiSetStyle(DEFAULT, TEXT_COLOR_PRESSED, ColorToInt(RED));
 
-  // variable to hold status flag for theme switching
+
+  // GUI program state
+  AppState currentState = STATE_IDLE;
   bool isDarkTheme = false;
 
-  // variable to hold the logging time set by the slider
-  float loggingSliderTime = 60.00f;
 
+  // main game loop
   while (!WindowShouldClose()) {
-    // create constant to hold button theme text depending on theme
+
+    // update states
+    if (currentState == STATE_LOGGING) {
+      // thread updates g_elapsed_time and g_is_logging automatically
+      if (!g_is_logging) {
+        currentState = STATE_GENERATING;
+        // call the function to generate images with `graphs.exe`
+        win32_launch_graphs();
+        currentState = STATE_DONE;
+      }
+    }
+
+    // theme button
     const char *buttonThemeTxt = isDarkTheme ? "Light Theme" : "Dark Theme";
-
-    // measure the size of the theme button text dynamically
     float themeBtnWidth = MeasureText(buttonThemeTxt, globalFontSize);
-
-    // setup theme button padding
     float themeButtonPadWidth = themeBtnWidth + 20.0f;
     float themeButtonPadHeight = globalFontSize + 10.0f;
-
-    // setup theme button positioning
     float themeButtonPosX = SCREEN_WIDTH - themeButtonPadWidth - 10.0f;
     float themeButtonPosY = 10.0f;
 
-    // create constant to hold main label title
-   const char *mainLabelTitle = "Mouse Coordinates Logger and Heatmap Generator";
+    // main title label
+    const char *mainLabelTitle = "Mouse Coordinates Logger and Heatmap Generator";
+    float mainLblWidth = MeasureText(mainLabelTitle, mainTitleFontSize);
+    float mainPadLblWidth = mainLblWidth + 10.0f;
+    float mainPadLblHeight = mainTitleFontSize + 6.0f;
+    float mainLblX = (SCREEN_WIDTH / 2.0f) - (mainLblWidth / 2.0f) + 20.0f;
+    float mainLblY = (SCREEN_HEIGHT / 2.0f) - (mainTitleFontSize / 2.0f) - 120.0f;
 
-   // measure the size of the main label text
-   float mainLblWidth = MeasureText(mainLabelTitle, mainTitleFontSize);
+    // slider
+    const char *leftSliderTxt = "Logging Time";
+    float leftSliderTxtWidth = MeasureText(leftSliderTxt, globalFontSize);
+    float sliderBarDragWidth = 420.0f;
+    float sliderBarDragHeight = 32.0f;
+    float sliderTextPadding = 10.0f;
+    float rightSliderTxtWidth = 80.0f;
+    float totalSliderBarWidth = leftSliderTxtWidth + sliderTextPadding +
+                                sliderBarDragWidth + sliderTextPadding +
+                                rightSliderTxtWidth;
+    float sliderBarRenderingStart = (SCREEN_WIDTH / 2.0f) - (totalSliderBarWidth / 2.0f);
+    float sliderBarX = sliderBarRenderingStart + leftSliderTxtWidth + sliderTextPadding;
+    float sliderBarY = (SCREEN_HEIGHT / 2.0f) - (globalFontSize / 2.0f) - 50.0f;
 
-   // setup main label padding
-   float mainPadLblWidth = mainLblWidth + 10.0f;
-   float mainPadLblHeight = mainTitleFontSize + 6.0f;
+    // stop logging button
+    const char *buttonStopTxt = "Stop Logging";
+    float stopBtnWidth = MeasureText(buttonStopTxt, globalFontSize);
+    float stopButtonPadWidth = stopBtnWidth + 20.0f;
+    float stopButtonPadHeight = globalFontSize + 10.0f;
+    float stopButtonPosX = 92.0f;
+    float stopButtonPosY = SCREEN_HEIGHT - stopButtonPadHeight - 10.0f;
 
-   // setup main label title positioning
-   float mainLblX = (SCREEN_WIDTH / 2.0f) - (mainLblWidth / 2.0f) + 20.0f;
-   float mainLblY = (SCREEN_HEIGHT / 2.0f) - (mainTitleFontSize / 2.0f) - 120.0f;
+    // start logging button
+    const char *buttonStartTxt = "Start Logging";
+    float startBtnWidth = MeasureText(buttonStartTxt, globalFontSize);
+    float startButtonPadWidth = startBtnWidth + 20.0f;
+    float startButtonPadHeight = globalFontSize + 10.0f;
+    float startButtonPosX = SCREEN_WIDTH - startButtonPadWidth - 116.0f;
+    float startButtonPosY = stopButtonPosY;
 
-   // create constant to hold left and right text of slider bar
-   const char *leftSliderTxt = "Logging Time";
+    // reset slider button
+    const char *buttonResetTxt = "Reset Slider";
+    float sliderResetBtnWidth = MeasureText(buttonResetTxt, globalFontSize);
+    float sliderResetBtnPadWidth = sliderResetBtnWidth + 20.0f;
+    float sliderResetBtnPadHeight = globalFontSize + 10.0f;
+    float sliderResetBtnPosX = (SCREEN_WIDTH / 2.0f) - (sliderResetBtnWidth / 2.0f);
+    float sliderResetBtnPosY = (SCREEN_HEIGHT / 2.0f) - (globalFontSize / 2.0f);
 
-   // measure the size of the left and right slider bar text
-   float leftSliderTxtWidth = MeasureText(leftSliderTxt, globalFontSize);
-   float rightSliderTxtWidth = 80.0f;
+    // "information" rectangle
+    float infoRectWidth = 600.0f;
+    float infoRectHeight = 80.0f;
+    float infoRectPosX = (SCREEN_WIDTH / 2.0f) - (infoRectWidth / 2.0f);
+    float infoRectPosY = (SCREEN_HEIGHT / 2.0f) - (infoRectHeight / 2.0f) + 80.0f;
 
-   // setup draggable size of slider bar
-   float sliderBarDragWidth = 420.0f;
-   float sliderBarDragHeight = 32.0f;
+    // text to write on screen / window based on current state
+    const char *infoText = "";
+    switch (currentState) {
+      case STATE_IDLE:
+        infoText = "Press Start Logging to get started";
+        break;
+      case STATE_LOGGING:
+        infoText = TextFormat("Time Remaining: %.1f seconds",
+                              (double)g_logging_duration - g_elapsed_time);
+        break;
+      case STATE_GENERATING:
+        infoText = "Logging complete... Generating heatmap";
+        break;
+      case STATE_DONE:
+        infoText = "Heatmap generated! Check your Downloads folder";
+        break;
+      case STATE_STOPPED:
+        infoText = "Logging stopped";
+        break;
+    }
 
-   // slider text padding
-   float sliderTextPadding = 10.0f;
 
-   // slider bar total width
-   float totalSliderBarWidth = leftSliderTxtWidth + sliderTextPadding + sliderBarDragWidth + sliderTextPadding + rightSliderTxtWidth;
+    // start drawing stuff to the window
+    BeginDrawing();
 
-   // slider bar position ( of where it should start rendering from )
-   float sliderBarRenderingStartPos = (SCREEN_WIDTH / 2.0f) - (totalSliderBarWidth / 2.0f);
+    // set the background colour ==> initially set to 'WHITE'
+    Color bgColor = GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR));
+    ClearBackground(bgColor);
 
-   // setup slider bar positioning
-   float sliderBarX = sliderBarRenderingStartPos + leftSliderTxtWidth + sliderTextPadding;
-   float sliderBarY = (SCREEN_HEIGHT / 2.0f) - (globalFontSize / 2.0f) - 50.0;
+    // theme button
+    if (GuiButton((Rectangle){themeButtonPosX, themeButtonPosY, themeButtonPadWidth, themeButtonPadHeight}, buttonThemeTxt)) {
+      // button pressed ==> swap the status check
+      isDarkTheme = !isDarkTheme;
 
-   // create constant to hold button stop text
-   const char *buttonStopTxt = "Stop Logging";
+      // if we are currently on light theme
+      if (isDarkTheme) {
+        // change the theme to dark
+        GuiLoadStyle("style_dark.rgs");
+        // set global button normal colour
+        GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(WHITE));
 
-   // measure the size of the stop logging button text
-   float stopBtnWidth = MeasureText(buttonStopTxt, globalFontSize);
+      // if we are currently on dark theme
+      } else {
+        // change theme to light ==> use raylib's default styling
+        GuiLoadStyleDefault();
+        // set global button normal colour
+        GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(BLACK));
+      }
 
-   // setup stop logging button padding
-   float stopButtonPadWidth = stopBtnWidth + 20.0f;
-   float stopButtonPadHeight = globalFontSize + 10.0f;
+      // NOTE: we need to set these again due to theme switcher reloading everything to default using `GuiLoadStyleDefault`
+      GuiSetStyle(DEFAULT, TEXT_SIZE, globalFontSize);
+      GuiSetStyle(DEFAULT, TEXT_COLOR_FOCUSED, ColorToInt(GREEN));
+      GuiSetStyle(DEFAULT, TEXT_COLOR_PRESSED, ColorToInt(RED));
+    }
 
-   // setup stop logging button positioning
-   float stopButtonPosX = 92.0f;
-   float stopButtonPosY = SCREEN_HEIGHT - stopButtonPadHeight - 10.0f;
+    // main title
+    GuiSetStyle(DEFAULT, TEXT_SIZE, mainTitleFontSize);
+    GuiLabel((Rectangle){mainLblX, mainLblY, mainPadLblWidth, mainPadLblHeight}, mainLabelTitle);
+    GuiSetStyle(DEFAULT, TEXT_SIZE, globalFontSize);
 
-   // create constant to hold button start text
-   const char *buttonStartTxt = "Start Logging";
+    // slider and reset ( only in IDLE and STOPPED states )
+    if (currentState == STATE_IDLE || currentState == STATE_STOPPED) {
+      // get the `volatile value` into an actual `float` data type for slider
+      float sliderValue = g_logging_duration;
 
-   // measure the size of the start logging button text
-   float startBtnWidth = MeasureText(buttonStartTxt, globalFontSize);
+      GuiSliderBar(
+        (Rectangle){sliderBarX, sliderBarY, sliderBarDragWidth, sliderBarDragHeight},
+        leftSliderTxt, TextFormat("%.0f s", sliderValue),
+        &sliderValue, 60, 3600
+      );
 
-   // setup start logging button padding
-   float startButtonPadWidth = startBtnWidth + 20.0f;
-   float startButtonPadHeight = globalFontSize + 10.0f;
+      // write slider value back to shared global
+      g_logging_duration = sliderValue;
 
-   // setup the start logging button positioning
-   float startButtonPosX = SCREEN_WIDTH - startButtonPadWidth - 116.0f;
-   float startButtonPosY = stopButtonPosY;
+      if (GuiButton((Rectangle){sliderResetBtnPosX, sliderResetBtnPosY, sliderResetBtnPadWidth, sliderResetBtnPadHeight}, buttonResetTxt)) {
+        g_logging_duration = 60.0f;
+      }
+    }
 
-   // create constant to hold button reset slider text
-   const char *buttonResetSliderTxt = "Reset Slider";
+    // "information" rectangle
+    GuiDrawRectangle(
+        (Rectangle){infoRectPosX, infoRectPosY, infoRectWidth, infoRectHeight},
+        2,
+        LIME,
+        BLANK
+    );
 
-   // measure the size of the of the reset slider button text
-   float sliderResetBtnWidth = MeasureText(buttonResetSliderTxt, globalFontSize);
+    // information text centred inside rectangle
+    float infoTextWidth = MeasureText(infoText, globalFontSize);
+    float infoTextX = infoRectPosX + (infoRectWidth / 2.0f) - (infoTextWidth / 2.0f);
+    float infoTextY = infoRectPosY + (infoRectHeight / 2.0f) - (globalFontSize / 2.0f);
+    Color infoTextColor = GetColor(GuiGetStyle(DEFAULT, TEXT_COLOR_NORMAL));
+    DrawText(infoText, (int)infoTextX, (int)infoTextY, (int)globalFontSize, infoTextColor);
 
-   // setup reset slider button padding
-   float sliderResetButtonPadWidth = sliderResetBtnWidth + 20.0f;
-   float sliderResetButtonPadHeight = globalFontSize + 10.0f;
+    // stop button ( only during logging )
+    if (currentState == STATE_LOGGING) {
+      if (GuiButton((Rectangle){stopButtonPosX, stopButtonPosY, stopButtonPadWidth, stopButtonPadHeight}, buttonStopTxt)) {
+        win32_stop_logging();
+        currentState = STATE_STOPPED;
+      }
+    }
 
-   // setup reset slider button positioning
-   float sliderResetButtonPosX = (SCREEN_WIDTH / 2.0f) - (sliderResetBtnWidth / 2.0f);
-   float sliderResetButtonPosY = (SCREEN_HEIGHT / 2.0f) - (globalFontSize / 2.0f);
+    // start button ( only in IDLE or STOPPED )
+    if (currentState == STATE_IDLE || currentState == STATE_STOPPED) {
+      if (GuiButton((Rectangle){startButtonPosX, startButtonPosY, startButtonPadWidth, startButtonPadHeight}, buttonStartTxt)) {
+        win32_start_logging();
+        currentState = STATE_LOGGING;
+      }
+    }
 
-   // setup information rectangle size
-   float infoRectangleWidth = 600.0f;
-   float infoRectangleHeight = 80.0f;
-
-   // setup information rectangle positioning
-   float infoRectanglePosX = (SCREEN_WIDTH / 2.0f) - (infoRectangleWidth / 2.0f); // INFO: not currently being used
-   float infoRectanglePosY = (SCREEN_HEIGHT / 2.0f) - (infoRectangleHeight / 2.0f) + 80.0f;
-
-   // start drawing stuff inside the window created
-   BeginDrawing();
-
-   // fetch the colour from the active theme
-   Color currentTheme = GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR));
-
-   // set the background colour to the current theme
-   ClearBackground(currentTheme);
-
-   // create our theme switcher button
-   if (GuiButton((Rectangle){themeButtonPosX, themeButtonPosY, themeButtonPadWidth, themeButtonPadHeight}, buttonThemeTxt)) {
-     // button pressed ==> swap the status check
-     isDarkTheme = !isDarkTheme;
-
-     // if we are currently on light theme
-     if (isDarkTheme) {
-       // change the theme to dark
-       GuiLoadStyle("style_dark.rgs");
-
-       // set global button normal colour
-       GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(WHITE));
-
-     // if we are currently on dark theme
-     } else {
-       // change theme to light ==> use raylib's default styling
-       GuiLoadStyleDefault();
-
-       // set global button normal colour
-       GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, ColorToInt(BLACK));
-     }
-
-     // NOTE: we need to do this again due to theme switcher reloading everything to default using `GuiLoadStyleDefaultj`
-     // set the font size to desired size
-     GuiSetStyle(DEFAULT, TEXT_SIZE, globalFontSize);
-     // set global button hover colour
-     GuiSetStyle(DEFAULT, TEXT_COLOR_FOCUSED, ColorToInt(GREEN));
-     // set global button pressed colour
-     GuiSetStyle(DEFAULT, TEXT_COLOR_PRESSED, ColorToInt(RED));
-   }
-
-   // change the font size ==> immediate mode GUI --> we need to do this
-   GuiSetStyle(DEFAULT, TEXT_SIZE, mainTitleFontSize);
-
-   // create main title label
-   GuiLabel((Rectangle){mainLblX, mainLblY, mainPadLblWidth, mainPadLblHeight}, mainLabelTitle);
-
-   // change the font back to what we had
-   GuiSetStyle(DEFAULT, TEXT_SIZE, globalFontSize);
-
-   // create slider bar for amount of time to log mouse coordinates
-   GuiSliderBar((Rectangle){sliderBarX, sliderBarY, sliderBarDragWidth, sliderBarDragHeight}, leftSliderTxt, TextFormat("%0.2f", loggingSliderTime), &loggingSliderTime, 60, 3600);
-
-   // create the reset slider button
-   if (GuiButton((Rectangle){sliderResetButtonPosX, sliderResetButtonPosY, sliderResetButtonPadWidth, sliderResetButtonPadHeight}, buttonResetSliderTxt)) {
-     // simply reset the actual current value for the slider bar for next "rendering frame"
-     loggingSliderTime = 60.00f;
-   }
-
-   // create the rectangle
-   GuiDrawRectangle((Rectangle){stopButtonPosX, infoRectanglePosY, infoRectangleWidth, infoRectangleHeight}, 2, LIME, BLANK);
-
-   // create the stop logging button
-   if (GuiButton((Rectangle){stopButtonPosX, stopButtonPosY, stopButtonPadWidth, stopButtonPadHeight}, buttonStopTxt)) {}
-
-   // create the start logging button
-   if (GuiButton((Rectangle){startButtonPosX, startButtonPosY, startButtonPadWidth, startButtonPadHeight}, buttonStartTxt)) {}
-
-   // drawing finishes ==> end the drawing
-   EndDrawing();
+    EndDrawing();
   }
 
-  // close the window created
+  // cleanup
+  win32_cleanup();
   CloseWindow();
 
   return 0;
