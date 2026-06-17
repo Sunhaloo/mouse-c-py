@@ -1,15 +1,19 @@
 # mouse-c-py
 
+> [!WARNING]
+> This is a "*semi-failed*" project.
+>
+> It does work but "*we*" could not complete it because it requires so much in-depth knowledge our how the 'Win32' API works.
+
 **Mouse logger** that generates a heatmap based on the position of your mouse on the screen and bar-chart for number of button clicks.
 
 - Mouse Coordinates Heatmap:
 
-![Mouse Coordinates - Heatmap](assets/mouse_coordinates_screen.png)
+![Mouse Coordinates - Heatmap](assets/mouse_coords_heatmap.png)
 
 - Mouse Button Clicks Bar Chart:
 
-![Mouse Button Clicks - Bar Chart](assets/mouse_clicks.png)
-
+![Mouse Button Clicks - Bar Chart](assets/mouse_clicks_count.png)
 
 It uses Raw Input to be able to get the data from the *input* device itself and uses `GetCursorPos` to get the actual coordinates of where the **cursor** is located on the screen and also the number of button clicks on the mouse.
 
