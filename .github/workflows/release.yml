@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install matplotlib numpy pyinstaller
+
+      - name: Install MSYS2
+        run: choco install msys2 -y
+
+      - name: Build program.exe
+        run: make build
+
+      - name: Build graphs.exe
+        shell: powershell
+        run: |
+          pyinstaller --onefile `
+          --clean `
+          --name graphs `
+          --hidden-import matplotlib.backends.backend_agg `
+          --exclude-module tkinter `
+          --exclude-module tcl `
+          --exclude-module _tkinter `
+          --exclude-module sqlite3 `
+          --exclude-module IPython `
+          --exclude-module jedi `
+          --exclude-module matplotlib.tests `
+          --exclude-module numpy.tests `
+          --exclude-module matplotlib.backends.backend_tkagg `
+          --exclude-module matplotlib.backends.backend_qt5agg `
+          --exclude-module matplotlib.backends.backend_pdf `
+          --exclude-module matplotlib.backends.backend_ps `
+          --exclude-module matplotlib.backends.backend_svg `
+          --exclude-module matplotlib.backends.backend_webagg `
+          --exclude-module notebook `
+          --exclude-module scipy `
+          --exclude-module xmlrpc `
+          --exclude-module email `
+          --exclude-module http `
+          --exclude-module PyQt5 `
+          --exclude-module PyQt6 `
+          --exclude-module PySide2 `
+          --exclude-module PySide6 `
+          main.py
+
+      - name: Show executable sizes
+        shell: powershell
+        run: |
+          Get-Item program.exe | Select-Object Name,Length
+          Get-Item dist/graphs.exe | Select-Object Name,Length
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            program.exe
+            dist/graphs.exe

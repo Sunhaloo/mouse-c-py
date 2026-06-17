@@ -1,0 +1,19 @@
+# compiled executables
+*.exe
+*.out
+*.app
+
+# intermediate objects
+*.o
+*.obj
+
+# pyinstaller build folders
+build/
+dist/
+*.spec
+
+# generated data
+*.csv
+
+# some random stuff ( might remove later )
+nul

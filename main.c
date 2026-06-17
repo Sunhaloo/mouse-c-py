@@ -1,0 +1,462 @@
+#include <pathcch.h>
+#include <stdio.h>
+#include <hidusage.h>
+#include <windows.h>
+
+// macro definition for how to long to run the program
+#define TIME_TO_RUN 60.0
+// macro definition for our CSV file name
+#define CSV_FILENAME "mouse_data.csv"
+// macro definition for our `graphs.exe` executable file name
+// #define PYTHON_GRAPHS_FILENAME "graphs.exe"
+// macro definition for our CSV file name --> wide strings ( unicode )
+#define CSV_FILENAME_W L"mouse_data.csv"
+// macro definition for our `graphs.exe` executable file name --> wide strings ( unicode )
+#define PYTHON_GRAPHS_FILENAME_W L"graphs.exe"
+// macro definition for our CSV writing "timer" / polling time
+#define CSV_POLLING_WRITING_INTERVAL 50
+// macro definition for our flushing count ( write immediately to disk )
+#define CSV_FLUSH_WRITE_COUNT 500
+
+// global handle to our hidden window
+HWND hwnd;
+
+// global variables for our raw input "relative" coordinates
+LONG last_x = 0;
+LONG last_y = 0;
+
+// forward declaration of WindowProc
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+// structure that contains information for our hidden window
+WNDCLASSEXW HiddenWindowClass = {0};
+
+// raw input device registration structure
+RAWINPUTDEVICE rid;
+
+// our point structure
+POINT coordinates;
+
+// FILE pointer for writing mouse data to CSV file
+FILE *csv_file;
+
+// simple function to display a horizontal rule based on the character provided
+void display_rule(int length, char character) {
+  printf("\n");
+
+  // iterate through the length given and display character
+  for (int i = 0; i < length; i++) {
+    printf("%c", character);
+  }
+
+  printf("\n");
+}
+
+// function to check if a file is present under the current working directory
+int check_file_existence(const wchar_t *filename) {
+  // part 1: get the current working directory
+
+  // create the buffer to hold current working directory
+  wchar_t getcwd_buffer[MAX_PATH];
+
+  // try to get the current working directory by calling function
+  DWORD getcwd_result = GetCurrentDirectoryW(MAX_PATH, getcwd_buffer);
+
+  // check if we have been able to get the current working directory
+  if (getcwd_result == 0) {
+    // meaning we failed to get the current working directory
+    fprintf(stderr, "\nFailed to get current working directory!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  }
+
+  // check if our ( result ) buffer is too small
+  if (getcwd_result >= MAX_PATH) {
+    fprintf(stderr, "\nGet current working directory buffer is too small!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  }
+
+  // display the current working directory
+  wprintf(L"\nCurrent Working Directory Buffer: %ls\n", getcwd_buffer);
+
+  // part 2: combine the paths
+
+  // create a buffer to hold the full path
+  wchar_t fullpath[MAX_PATH] = {0};
+
+  // try to combine paths by calling function
+  HRESULT hr = PathCchCombine(fullpath, MAX_PATH, getcwd_buffer, filename);
+
+  // check if we have been able to combine the paths
+  if (FAILED(hr)) {
+    // meaning that the paths were not able to be combined
+    fprintf(stderr, "\nFailed to combine paths ( Error Code: 0x%08lx )!\n", (unsigned long)hr);
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  }
+
+  // display the full combined paths
+  wprintf(L"\nCombined Path Buffer: %ls\n", fullpath);
+
+  // part 3: check if the file actually exists in the directory
+
+  // try to check if file exists by calling function
+  DWORD attrs = GetFileAttributesW(fullpath);
+
+  // check if the file actually exists
+  if (attrs == INVALID_FILE_ATTRIBUTES) {
+    // meaning that the file does NOT exists
+    fprintf(stderr, "\nERROR: File does not exists!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  } else {
+    // meaning that the file does exists
+    printf("\nFile Attributes Checker: File does exists!\n");
+  }
+
+  // part 4: check if the file is an actual file or directory
+  if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
+    // meaning that its actually a directory
+    fprintf(stderr, "\nERROR: Path is a directory!\n");
+    fflush(stderr);
+
+    // exit the function with an error
+    return 1;
+  } else {
+    // meaning that its actually a file
+    printf("\nFile Checker: Path is a file!\n");
+  }
+
+  display_rule(50, '-');
+
+  return 0;
+}
+
+
+// function to handle all non-raw-input message
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+  // using `switch ... case` as it the standard and is natural for working with 'Win32'
+  // additionally, given how 'Win32' was built --> make sense to use `switch ... case`
+  // so that the readability improves compared to using `if ... else` statements
+  switch(msg) {
+    // if the incoming message is under the category of "raw-input"
+    // NOTE: for more information see variable scope / "scoping"
+    case WM_INPUT: {
+      // get the raw input data from `lParam`
+      HRAWINPUT hRawInput = (HRAWINPUT)lParam;
+      // the actual mouse buttons data
+      RAWINPUT raw;
+      // size of the raw mouse buttons data
+      UINT size = sizeof(RAWINPUT);
+
+      // function to be able to extract the necessary data from the mouse
+      UINT cbSize = GetRawInputData(
+          hRawInput,
+          RID_INPUT,
+          &raw,
+          &size,
+          sizeof(RAWINPUTHEADER)
+      );
+
+      // check if `GetRawInputData` failed
+      if (cbSize == (UINT)-1) {
+          fprintf(stderr, "\nFailed to get raw input data! Error: %lu\n", GetLastError());
+          fflush(stderr);
+          return 0;
+      }
+
+      // use the `GetCursorPos` function to get the coordinates
+      if (GetCursorPos(&coordinates)) {
+        // NOTE: only display coordinates if and only if its different
+        if (coordinates.x != last_x || coordinates.y != last_y) {
+          // NOTE: no need to display the coordinates anymore as we are writing to file
+          // printf("x: %ld, y: %ld\n", coordinates.x, coordinates.y);
+
+          // update the global variable for the last coordinates found
+          last_x = coordinates.x;
+          last_y = coordinates.y;
+        }
+
+      } else {
+        fprintf(stderr, "\nFailed To Retrieve Cursor Coordinates! Error: %lu", GetLastError());
+        fflush(stderr);
+      }
+
+      // main mouse buttons temporary variable
+      int left = 0, right = 0, middle = 0;
+      // side mouse buttons temporary variable
+      int back = 0, forward = 0;
+      // scroll wheel temporary variable
+      int scroll_up = 0, scroll_down = 0;
+
+      // get the actual mouse buttons data
+      USHORT flags = raw.data.mouse.usButtonFlags;
+      if (flags & RI_MOUSE_LEFT_BUTTON_DOWN) left = 1;
+      if (flags & RI_MOUSE_RIGHT_BUTTON_DOWN)  right = 1;
+      if (flags & RI_MOUSE_MIDDLE_BUTTON_DOWN) middle = 1;
+      if (flags & RI_MOUSE_BUTTON_4_DOWN) back = 1;
+      if (flags & RI_MOUSE_BUTTON_5_DOWN) forward = 1;
+
+      // scroll wheel data logging
+      // INFO: given that we have positive and negative values depending on which
+      // direction the user is scrolling the scroll-wheel ( see official docs )
+      // we are going to have to add an `if` statement to check for that "value"
+      if (flags & RI_MOUSE_WHEEL) {
+        // get the data from the scroll well ( through the inner structure )
+        // INFO: again for more information ask LLM or see docs
+        SHORT scroll = (SHORT)raw.data.mouse.usButtonData;
+
+        // if scroll wheel if moving away from user ==> up
+        if (scroll > 0) {
+          scroll_up = 1;
+          // if scroll wheel if moving towards from user ==> down
+        } else if (scroll < 0) {
+          scroll_down = 1;
+        }
+      }
+
+      // see below for "flushing" to disk immediately
+      static int write_count = 0;
+
+      // write the mouse data to the CSV file we created
+      fprintf(csv_file, "%ld,%ld,%d,%d,%d,%d,%d,%d,%d\n", coordinates.x, coordinates.y, left, right, middle, back, forward, scroll_up, scroll_down);
+
+      // force data to disk immediately ==> in case of program crash when "logging time" is increased
+      // NOTE: writing to disk immediately ( instead of the buffer ) is costly ==> flush for every 500 writes
+      if (++write_count % CSV_FLUSH_WRITE_COUNT == 0) {
+        // write to the disk for these `CSV_FLUSH_WRITE_COUNT` lines
+        fflush(csv_file);
+      }
+
+      // NOTE: `return 0` so that we confirm that we handle this message
+      return 0;
+    }
+
+    // for all the other message; let `DefWindowProcW` handle it for us
+    default:
+      return DefWindowProcW(hwnd, msg, wParam, lParam);
+  }
+}
+
+// our main function
+// FUN FACT: if you are not using "inline" arguments from the terminal
+// instead of using `int argc, char *argv[]` ==> simply use `void` instead
+int main(void) {
+  // display a little message that the C program is starting
+  display_rule(50, '=');
+  printf("\n\t\tC Program Starting\n");
+  display_rule(50, '=');
+
+  // variable to keep the elapsed time
+  double elapsed_time = 0;
+
+  // declare variables for the timer
+  LARGE_INTEGER frequency;
+  LARGE_INTEGER start, current;
+
+  // initialize `HiddenWindowClass` at runtime
+  // INFO: doing it in this way to avoid declaration errors
+  HiddenWindowClass.cbSize        = sizeof(WNDCLASSEXW);
+  HiddenWindowClass.lpfnWndProc   = WindowProc;
+  HiddenWindowClass.hInstance     = GetModuleHandleW(NULL);
+  HiddenWindowClass.lpszClassName = L"RawInputWindow";
+
+  // actually register the window class for subsequent use
+  if (!RegisterClassExW(&HiddenWindowClass)) {
+    fprintf(stderr, "\nFailed to register window class! Error: %lu\n", GetLastError());
+    fflush(stderr);
+    return 1;
+  }
+
+  // create a window ==> pass "correct" parameters to make it hidden
+  hwnd = CreateWindowExW(
+    0,
+    L"RawInputWindow",
+    L"",
+    0,
+    0,
+    0,
+    0,
+    0,
+    HWND_MESSAGE,
+    NULL,
+    GetModuleHandleW(NULL),
+    NULL
+  );
+
+  // check if window creation is successfull or not
+  if (hwnd == NULL) {
+    fprintf(stderr, "\nFailed to create window! Error: %lu\n", GetLastError());
+    fflush(stderr);
+    return 1;
+  }
+
+  // configure the raw input device structure to target mouse input
+  rid.usUsagePage = HID_USAGE_PAGE_GENERIC;
+  rid.usUsage     = HID_USAGE_GENERIC_MOUSE;
+  rid.dwFlags     = RIDEV_INPUTSINK;
+  rid.hwndTarget  = hwnd;
+
+  // actually register the raw input devices ( in our case mouse devices )
+  // NOTE: pass the struct, the number of devies to register and size of struct
+  if (!RegisterRawInputDevices(&rid, 1, sizeof(RAWINPUTDEVICE))) {
+    fprintf(stderr, "\nFailed to register raw input device! Error: %lu\n", GetLastError());
+    fflush(stderr);
+    return 1;
+  }
+
+  // initialise the message structure's data to '0'
+  MSG message = {0};
+
+  // get the number of ticks that makes up one second from CPU
+  QueryPerformanceFrequency(&frequency);
+
+  // get the actual time stamp for the start time
+  QueryPerformanceCounter(&start);
+
+  // open the CSV file to write to --> start from scratch each program run
+  csv_file = fopen(CSV_FILENAME, "w");
+
+  // check if the file has been able to open
+  if (csv_file == NULL) {
+    fprintf(stderr, "\nFailed to open CSV file for writing!\n");
+    fflush(stderr);
+
+    // return with an error
+    return 1;
+  }
+
+  // write the header for the CSV file
+  fprintf(csv_file, "x,y,left,right,middle,back,forward,scroll_up,scroll_down\n");
+
+  display_rule(50, '-');
+
+  // iterate through the `while` loop indefinitely
+  while (1) {
+    // get the messages from the queue
+    while (PeekMessageW(&message, hwnd, 0, 0, PM_REMOVE)) {
+      // send that message to the hidden window for processing
+      // whereby our mouse raw data will be handled
+      DispatchMessageW(&message);
+    }
+
+    // get the actual time stamp for the current time
+    QueryPerformanceCounter(&current);
+
+    // calculate the elapsed time
+    elapsed_time = (double)(current.QuadPart - start.QuadPart) / frequency.QuadPart;
+
+    // calaculate the remaining time before the program ends
+    double remaining = TIME_TO_RUN - elapsed_time;
+
+    printf("\rRecording Mouse Data | Time Remaining: %.1f s", remaining);
+
+    // NOTE: flushing directly to the screen as we are inside a `while` loop
+    fflush(stdout);
+
+    // check if the time to "leave" has been reached!
+    if (elapsed_time >= TIME_TO_RUN) {
+      // `break` to "exit" the `while` loop
+      break;
+    }
+
+    // sleep the program for 50 miliseconds to avoid large CSV files
+    Sleep(CSV_POLLING_WRITING_INTERVAL);
+  }
+
+  display_rule(50, '-');
+
+  // change the --> for aesthetic purposes
+  printf("\n");
+
+  // close the file to free up memory
+  fclose(csv_file);
+
+  // start the file checking process
+  display_rule(50, '=');
+  printf("\n  C Program Starting File Checking Process\n");
+  display_rule(50, '=');
+
+  display_rule(50, '-');
+
+  // check if the CSV file has been created under the current directory
+  if (check_file_existence(CSV_FILENAME_W) != 0) {
+
+    // meaning our CSV file is not present
+    fprintf(stderr, "\nCSV File '%s' Missing - Cancelling Graphs Generation!\n", CSV_FILENAME);
+    fflush(stderr);
+
+    // check if the CSV file has been downloaded and moved to the current ( working ) directory
+  } else if (check_file_existence(PYTHON_GRAPHS_FILENAME_W) != 0) {
+
+    // meaning our "Python" executable file is not present
+    fprintf(stderr, "\nPython Executable File '%ls' Missing - Cancelling Graphs Generation!\n", PYTHON_GRAPHS_FILENAME_W);
+    fflush(stderr);
+
+    // meaning that everything is present for graph generation
+  } else {
+    // call the `graphs.exe` created by `pyinstaller` from the `main.py` file
+    // INFO: this calls the `graphs.exe` file which is going to search
+    // for our CSV file and then be able to generate the graphs in our downloads folder!
+
+    // create array for new process start-up and process information
+    // INFO: again, this is created / used for the `CreateProcessW` function
+    STARTUPINFOW si = {0};
+    PROCESS_INFORMATION pi = {0};
+
+    // find the size of the structure / array `si` --> for the startup information
+    si.cb = sizeof(si);
+
+    // create a new process and run `graphs.exe` in that process
+    if (!CreateProcessW(
+      // name of process / executable to run
+      PYTHON_GRAPHS_FILENAME_W,
+      NULL,
+      NULL,
+      NULL,
+      // does not inherit any handles
+      FALSE,
+      // no creation flags has been passed
+      0,
+      NULL,
+      NULL,
+      // start-up information
+      &si,
+      // process information
+      &pi
+    )) {
+      // meaning that the program `graphs.exe` was not found or something
+      fprintf(stderr, "\nFailed To Launch `graphs.exe`! Error: %lu\n", GetLastError());
+      fflush(stderr);
+
+    } else {
+      // meaning that our `graphs.exe` as found ==> wait for it to complete
+      WaitForSingleObject(pi.hProcess, INFINITE);
+
+      // close the handle for the new process
+      CloseHandle(pi.hProcess);
+      CloseHandle(pi.hThread);
+    }
+  }
+
+  // destroy the hidden window that we created
+  DestroyWindow(hwnd);
+  // unregister the window class
+  UnregisterClassW(L"RawInputWindow", GetModuleHandleW(NULL));
+
+  // display a little message that the C program is exiting
+  display_rule(50, '=');
+  printf("\n\t\tC Program Exiting\n");
+  display_rule(50, '=');
+
+  return 0;
+}
