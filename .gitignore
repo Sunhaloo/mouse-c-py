@@ -7,6 +7,9 @@
 *.o
 *.obj
 
+# python virtual environment
+venv/
+
 # pyinstaller build folders
 build/
 dist/
